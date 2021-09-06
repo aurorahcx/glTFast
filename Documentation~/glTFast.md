@@ -6,25 +6,16 @@ It focuses on speed, memory efficiency and a small build footprint.
 
 Two workflows are supported
 
-- Load glTF assets fast and efficient at runtime
+- Load glTF assets at runtime
 - Import glTF assets as prefabs into the asset database at design-time in the Unity Editor
 
 Try the [WebGL Demo][gltfast-web-demo] and check out the [demo project](https://github.com/atteneder/glTFastDemo).
 
 ## Features
 
-*glTFast* supports large parts of the glTF 2.0 specification plus many extensions, works with URP, HDRP, the Built-In render pipe and runs on following platforms:
+*glTFast* supports the full [glTF 2.0 specification][gltf-spec] and many extensions. It works with Universal, High Definition and the Built-In Render Pipelines on all platforms.
 
-- WebGL
-- iOS
-- Android
-- Windows
-- macOS
-- Linux
-- Universal Windows Platform
-
-
-Get more details from the [list of features/extensions](./features.md).
+See all details at the [list of features/extensions](./features.md).
 
 ## Usage
 
@@ -67,12 +58,40 @@ async void LoadGltfBinaryFromMemory() {
 Loading via script allows you to:
 
 - Custom download or file loading behaviour (see [`IDownloadProvider`](../Runtime/Scripts/IDownload.cs))
+- Customize loading behaviour (like texture settings) via [`ImportSettings`](#import-settings)
 - Custom material generation (see [`IMaterialGenerator`](../Runtime/Scripts/IMaterialGenerator.cs))
 - Customize [instantiation](#Instantiation)
 - Load glTF once and instantiate its scenes many times (see example [below](#custom-post-loading-behaviour))
 - Access data of glTF scene (for example get material; see example [below](#custom-post-loading-behaviour))
 - Load [reports](#report) allow reacting and communicating incidents during loading and instantiation
 - Tweak and optimize loading performance
+
+#### Import Settings
+
+`GltfImport.Load` accepts an optional instance of [`ImportSettings`](../Runtime/Scripts/ImportSettings.cs) as parameter. Have a look at this class to see all options available. Here's an example usage:
+
+```C#
+async void Start() {
+    var gltf = new GLTFast.GltfImport();
+
+    // Create a settings object and configure it accordingly
+    var settings = new ImportSettings {
+        generateMipMaps = true,
+        anisotropicFilterLevel = 3,
+        nodeNameMethod = ImportSettings.NameImportMethod.OriginalUnique
+    };
+    
+    // Load the glTF and pass along the settings
+    var success = await gltf.Load("file:///path/to/file.gltf", settings);
+
+    if (success) {
+        gltf.InstantiateMainScene(new GameObject("glTF").transform);
+    }
+    else {
+        Debug.LogError("Loading glTF failed!");
+    }
+}
+```
 
 #### Custom Post-Loading Behaviour
 
@@ -110,7 +129,7 @@ async void Start() {
 
 Creating actual GameObjects (or Entities) from the imported data (Meshes, Materials) is called instantiation.
 
-You can customize it by providing an implementation of `IInstantiator` ( see [source](./Runtime/Scripts/IInstatiator.cs) and the reference implementation [`GameObjectInstantiator`](./Runtime/Scripts/GameObjectInstantiator.cs) for details).
+You can customize it by providing an implementation of `IInstantiator` ( see [source](../Runtime/Scripts/IInstantiator.cs) and the reference implementation [`GameObjectInstantiator`](../Runtime/Scripts/GameObjectInstantiator.cs) for details).
 
 Inject your custom instantiation like so
 
@@ -302,6 +321,7 @@ It also uses fast low-level memory copy methods, [Unity's Job system](https://do
 
 [unity]: https://unity.com
 [gltf]: https://www.khronos.org/gltf
+[gltf-spec]: https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md
 [gltfast-web-demo]: https://gltf.pixel.engineer
 [gltfasset_component]: ./img/gltfasset_component.png  "Inspector showing a GltfAsset component added to a GameObject"
 [gltfast3to4]: ./img/gltfast3to4.png  "3D scene view showing BoomBoxWithAxes model twice. One with the legacy axis conversion and one with the new orientation"

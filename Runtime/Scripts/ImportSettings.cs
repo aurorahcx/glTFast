@@ -16,7 +16,9 @@
 using System;
 
 namespace GLTFast {
-    
+
+    using Schema;
+
     [Serializable]
     public class ImportSettings {
         
@@ -48,5 +50,23 @@ namespace GLTFast {
 
         public NameImportMethod nodeNameMethod = NameImportMethod.Original;
         public AnimationMethod animationMethod = AnimationMethod.Legacy;
+
+        /// <summary>
+        /// Set this property to true to enable mip map generation.
+        /// Note: Creating mipmaps from Jpeg/PNG textures is very slow (at the moment).
+        /// See https://github.com/atteneder/glTFast/issues/220 for details 
+        /// </summary>
+        public bool generateMipMaps = false;
+
+        /// <summary>
+        /// These two properties define the default filtering mode for textures that have no such specification in data
+        /// </summary>
+        public Sampler.MinFilterMode defaultMinFilterMode = Sampler.MinFilterMode.Linear;
+        public Sampler.MagFilterMode defaultMagFilterMode = Sampler.MagFilterMode.Linear;
+
+        /// <summary>
+        /// This property defines the anisotropic filtering level for textures
+        /// </summary>
+        public int anisotropicFilterLevel = 1;
     }
 }

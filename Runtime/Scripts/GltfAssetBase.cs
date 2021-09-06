@@ -15,13 +15,12 @@
 
 using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.Events;
 
 namespace GLTFast
 {
     using Loading;
 
-    public class GltfAssetBase : MonoBehaviour
+    public abstract class GltfAssetBase : MonoBehaviour
     {
         protected GltfImport importer;
         
@@ -32,11 +31,6 @@ namespace GLTFast
         public bool isDone => importer!=null && importer.LoadingDone;
         
         public int? currentSceneId { get; protected set; }
-        
-        /// <summary>
-        /// Latest scene's instance.  
-        /// </summary>
-        public GameObjectInstantiator.SceneInstance sceneInstance { get; protected set; }
         
         /// <summary>
         /// Method for manual loading with custom <see cref="IDownloadProvider"/> and <see cref="IDeferAgent"/>.
@@ -68,8 +62,7 @@ namespace GLTFast
             if (importer == null) return false;
             var instantiator = GetDefaultInstantiator(logger);
             var success = importer.InstantiateMainScene(instantiator);
-            sceneInstance = instantiator.sceneInstance;
-            currentSceneId = success ? importer.defaultSceneIndex : (int?)null;
+            PostInstantiation(instantiator, success);
             return success;
         }
 
@@ -83,8 +76,7 @@ namespace GLTFast
             if (importer == null) return false;
             var instantiator = GetDefaultInstantiator(logger);
             var success = importer.InstantiateScene(instantiator,sceneIndex);
-            sceneInstance = instantiator.sceneInstance;
-            currentSceneId = success ? sceneIndex : (int?)null;
+            PostInstantiation(instantiator, success);
             return success;
         }
 
@@ -97,20 +89,14 @@ namespace GLTFast
         protected bool InstantiateScene(int sceneIndex, GameObjectInstantiator instantiator) {
             if (importer == null) return false;
             var success = importer.InstantiateScene(instantiator,sceneIndex);
-            sceneInstance = instantiator.sceneInstance;
-            currentSceneId = success ? sceneIndex : (int?)null;
+            PostInstantiation(instantiator, success);
             return success;
         }
 
         /// <summary>
         /// Removes previously instantiated scene(s)
         /// </summary>
-        public void ClearScenes() {
-            foreach (Transform child in transform) {
-                Destroy(child.gameObject);
-            }
-            sceneInstance = null;
-        }
+        public abstract void ClearScenes();
 
         /// <summary>
         /// Returns an imported glTF material.
@@ -142,9 +128,11 @@ namespace GLTFast
                 return null;
             }
         }
+
+        protected abstract IInstantiator GetDefaultInstantiator(ICodeLogger logger);
         
-        protected virtual GameObjectInstantiator GetDefaultInstantiator(ICodeLogger logger) {
-            return new GameObjectInstantiator(importer, transform, logger);
+        protected virtual void PostInstantiation(IInstantiator instantiator, bool success) {
+            currentSceneId = success ? importer.defaultSceneIndex : (int?)null;
         }
 
         protected virtual void OnDestroy()
