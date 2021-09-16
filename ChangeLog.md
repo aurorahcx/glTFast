@@ -4,14 +4,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 
+## [4.3.1] - 2021-09-14
+### Changed
+- Point clouds (POINTS primitive mode) are approved now - removed error log
+### Fixed
+- Avoid Burst compiler issue on Windows by using `UnsafeUtility.MemCpy` over `System.Buffer.MemoryCopy` (#245)
+
+## [4.3.0] - 2021-09-10
 ### Added
 - Multiple texture related import settings (thanks [@aurorahcx][aurorahcx] for #215)
   - `generateMipMaps` (default is false)
   - `defaultMinFilterMode` (minification; default is linear)
   - `defaultMagFilterMode` (magnification; default is linear)
   - `anisotropicFilterLevel` (default is 1)
+- Unit tests for all vertex/index buffer conversion jobs
 ### Changed
+- Performance improvement due to enabling Burst compiler on all vertex/index buffer conversion jobs
 - `defaultMinFilterMode` was changed to `Linear` (from `NearestMipmapLinear`). This way textures will fall back to bilinear filtering (`FilterMode.Bilinear`) when it was not specified explicitly.
 - `GameObject` specifics were moved from `GltfAssetBase` into `GltfAsset` in preparation for ECS
 - Exposing glTFast assembly internals to glTF-test-framework
@@ -19,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Memory corruption when using unsigned byte positions or signed short UVs
 - Set `_METALLICGLOSSMAP` and `_OCCLUSION` keywords in material editor on texture import (thanks [@hybridherbst][hybridherbst] for #237)
 - Missing name on some textures
+- Incorrect rotations from signed byte quaternions
+- Incorrect UVs when using unsigned byte or signed/unsigned short texture coordinates
+- Incorrect values converting signed byte encoded tangents
+- Correct specular-glossiness materials in spite of (correct or incorrect) presence of metallic-roughness properties (fixes #241)
 
 ## [4.2.1] - 2021-08-26
 ### Changed
