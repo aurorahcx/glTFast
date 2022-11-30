@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ using UnityEngine.Rendering;
 
 namespace GLTFast {
 
-    using Vertex;
+    using Logging;
     using Schema;
 
     abstract class VertexBufferTexCoordsBase {
@@ -83,12 +83,9 @@ namespace GLTFast {
         }
 
         public override void AddDescriptors(VertexAttributeDescriptor[] dst, ref int offset, int stream) {
-            VertexAttribute vatt = VertexAttribute.TexCoord0;
             for (int i = 0; i < uvSetCount; i++) {
-                if (i == 1) {
-                    vatt = VertexAttribute.TexCoord1;
-                }
-                dst[offset] = new VertexAttributeDescriptor(vatt, VertexAttributeFormat.Float32, 2, stream);
+                var vertexAttribute = (VertexAttribute)((int)VertexAttribute.TexCoord0+i);
+                dst[offset] = new VertexAttributeDescriptor(vertexAttribute, VertexAttributeFormat.Float32, 2, stream);
                 offset++;
             }
         }

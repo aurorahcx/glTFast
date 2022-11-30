@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,11 +14,15 @@
 //
 
 using System;
+using UnityEngine;
 
 namespace GLTFast {
 
     using Schema;
-
+    
+    /// <summary>
+    /// glTF import settings
+    /// </summary>
     [Serializable]
     public class ImportSettings {
         
@@ -29,7 +33,7 @@ namespace GLTFast {
             /// <summary>
             /// Use original node names.
             /// Fallback to mesh's name (if present)
-            /// Fallback to "Node_<index>" as last resort. 
+            /// Fallback to "Node_&lt;index&gt;" as last resort. 
             /// </summary>
             Original,
             /// <summary>
@@ -41,14 +45,31 @@ namespace GLTFast {
             OriginalUnique
         }
 
+        /// <summary>
+        /// Target animation system
+        /// </summary>
         public enum AnimationMethod
         {
+            /// <summary>
+            /// Don't target or import animation
+            /// </summary>
             None,
+            /// <summary>
+            /// <see href="https://docs.unity3d.com/Manual/Animations.html">Legacy Animation System</see>
+            /// </summary>
             Legacy,
+            /// <summary>
+            /// <see href="https://docs.unity3d.com/Manual/AnimationOverview.html">Default Animation System (Mecanim)</see>
+            /// </summary>
             Mecanim
         }
 
+        /// <inheritdoc cref="NameImportMethod"/>
+        [Tooltip("Controls how node names are created.")]
         public NameImportMethod nodeNameMethod = NameImportMethod.Original;
+        
+        /// <inheritdoc cref="AnimationMethod"/>
+        [Tooltip("Target animation system.")]
         public AnimationMethod animationMethod = AnimationMethod.Legacy;
 
         /// <summary>
@@ -56,17 +77,25 @@ namespace GLTFast {
         /// Note: Creating mipmaps from Jpeg/PNG textures is very slow (at the moment).
         /// See https://github.com/atteneder/glTFast/issues/220 for details 
         /// </summary>
-        public bool generateMipMaps = false;
+        [Tooltip("Controls if mipmaps are created for imported textures.")]
+        public bool generateMipMaps;
 
         /// <summary>
-        /// These two properties define the default filtering mode for textures that have no such specification in data
+        /// Defines the default minification filter mode for textures that have no such specification in data
         /// </summary>
+        [Tooltip("Minification filter mode fallback if no mode was provided.")]
         public Sampler.MinFilterMode defaultMinFilterMode = Sampler.MinFilterMode.Linear;
+        
+        /// <summary>
+        /// Define the default magnification filter mode for textures that have no such specification in data
+        /// </summary>
+        [Tooltip("Magnification filter mode fallback if no mode was provided.")]
         public Sampler.MagFilterMode defaultMagFilterMode = Sampler.MagFilterMode.Linear;
 
         /// <summary>
-        /// This property defines the anisotropic filtering level for textures
+        /// This property defines the anisotropic filtering level for imported textures
         /// </summary>
+        [Tooltip("Anisotropic filtering level for imported textures.")]
         public int anisotropicFilterLevel = 1;
     }
 }

@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +15,9 @@
 
 namespace GLTFast.Schema {
 
+    /// <summary>
+    /// Sparse indices property of a glTF <seealso cref="AccessorSparse"/>
+    /// </summary>
     [System.Serializable]
     public class AccessorSparseIndices {
         /// <summary>
@@ -36,5 +39,15 @@ namespace GLTFast.Schema {
         /// `5125` (UNSIGNED_INT)
         /// </summary>
         public GLTFComponentType componentType;
+
+        internal void GltfSerialize(JsonWriter writer) {
+            writer.AddObject();
+            writer.AddProperty("bufferView", bufferView);
+            writer.AddProperty("componentType", componentType);
+            if (byteOffset >= 0) {
+                writer.AddProperty("byteOffset", byteOffset);
+            }
+            writer.Close();
+        }
     }
 }

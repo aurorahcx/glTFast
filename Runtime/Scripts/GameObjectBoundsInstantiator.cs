@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,23 +18,44 @@ using UnityEngine;
 
 namespace GLTFast {
 
+    using Logging;
+    
+    /// <summary>
+    /// Generates a GameObject hierarchy from a glTF scene and provides its bounding box 
+    /// </summary>
     public class GameObjectBoundsInstantiator : GameObjectInstantiator {
 
         Dictionary<uint, Bounds> nodeBounds;
 
-        public GameObjectBoundsInstantiator(IGltfReadable gltf, Transform parent, ICodeLogger logger = null) : base(gltf,parent,logger) {}
+        /// <inheritdoc />
+        public GameObjectBoundsInstantiator(
+            IGltfReadable gltf,
+            Transform parent,
+            ICodeLogger logger = null,
+            InstantiationSettings settings = null
+            ) : base(gltf,parent,logger,settings) {}
         
-        public override void Init() {
-            base.Init();
+        /// <inheritdoc />
+        public override void BeginScene(
+            string name,
+            uint[] rootNodeIndices
+            ) 
+        {
+            base.BeginScene(
+				name,
+				rootNodeIndices
+				);
             nodeBounds = new Dictionary<uint, Bounds>();
         }
 
+        /// <inheritdoc />
         public override void AddPrimitive(
             uint nodeIndex,
             string meshName,
             Mesh mesh,
             int[] materialIndices,
             uint[] joints = null,
+            uint? rootJoint = null,
             float[] morphTargetWeights = null,
             int primitiveNumeration = 0
         ) {
@@ -44,6 +65,7 @@ namespace GLTFast {
                 mesh,
                 materialIndices,
                 joints,
+                rootJoint,
                 morphTargetWeights,
                 primitiveNumeration
             );
@@ -60,6 +82,10 @@ namespace GLTFast {
             }
         }
 
+        /// <summary>
+        /// Attempts to calculate the instance's bounds
+        /// </summary>
+        /// <returns>Instance's bounds, if calculation succeeded</returns>
         public Bounds? CalculateBounds() {
 
             if (nodeBounds == null) { return null; }

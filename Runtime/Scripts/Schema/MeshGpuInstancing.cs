@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,16 +17,41 @@ using UnityEngine;
 
 namespace GLTFast.Schema {
 
+    /// <summary>
+    /// Extension for enabling GPU instancing, rendering many copies of a
+    /// single mesh at once using a small number of draw calls.
+    /// <seealso href="https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Vendor/EXT_mesh_gpu_instancing"/>
+    /// </summary>
     [System.Serializable]
     public class MeshGpuInstancing {
 
+        /// <summary>
+        /// Per-instance attributes collection
+        /// </summary>
         [System.Serializable]
         public class Attributes {
+            
+            /// <summary>
+            /// Instance positions accessor index
+            /// </summary>
             public int TRANSLATION = -1;
+            
+            /// <summary>
+            /// Instance rotations accessor index
+            /// </summary>
             public int ROTATION = -1;
+            
+            /// <summary>
+            /// Instance scales accessor index
+            /// </summary>
             public int SCALE = -1;
         }
 
+        /// <inheritdoc cref="Attributes"/>
         public Attributes attributes;
+
+        internal void GltfSerialize(JsonWriter writer) {
+            throw new System.NotImplementedException();
+        }
     }
 }

@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,9 +19,10 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
-using UnityEngine.Assertions;
 using UnityEngine.Profiling;
 using Mesh = UnityEngine.Mesh;
+using System.Threading.Tasks;
+using GLTFast.Logging;
 
 namespace GLTFast {
 
@@ -30,12 +31,14 @@ namespace GLTFast {
         NativeArray<JobHandle> handles;
         int currentIndex;
         string[] meshTargetNames;
+        IDeferAgent deferAgent;
 
-        public MorphTargetsContext(int morphTargetCount, string[] meshTargetNames) {
+        public MorphTargetsContext(int morphTargetCount, string[] meshTargetNames, IDeferAgent deferAgent) {
             contexts = new MorphTargetContext[morphTargetCount];
             handles = new NativeArray<JobHandle>(morphTargetCount, VertexBufferConfigBase.defaultAllocator);
             currentIndex = 0;
             this.meshTargetNames = meshTargetNames;
+            this.deferAgent = deferAgent;
         }
         
         public bool AddMorphTarget(
@@ -71,11 +74,12 @@ namespace GLTFast {
             return handle;
         }
 
-        public void ApplyOnMeshAndDispose(Mesh mesh) {
+        public async Task ApplyOnMeshAndDispose(Mesh mesh) {
             for (var index = 0; index < contexts.Length; index++) {
                 var context = contexts[index];
                 context.AddToMesh(mesh, meshTargetNames?[index] ?? index.ToString());
                 context.Dispose();
+                await deferAgent.BreakPoint();
             }
             contexts = null;
         }
@@ -146,11 +150,6 @@ namespace GLTFast {
             fixed (void* dest = &(positions[0])) {
                 JobHandle? h = null;
                 if (posData!=null) {
-#if DEBUG
-                    if (posAcc.normalized) {
-                        Debug.LogError("Normalized Positions will likely produce incorrect results. Please report this error at https://github.com/atteneder/glTFast/issues/new?assignees=&labels=bug&template=bug_report.md&title=Normalized%20Positions");
-                    }
-#endif
                     h = VertexBufferConfigBase.GetVector3sJob(
                         posData,
                         posAcc.count,
@@ -158,7 +157,8 @@ namespace GLTFast {
                         posByteStride,
                         (float3*)dest,
                         12,
-                        posAcc.normalized
+                        posAcc.normalized,
+                        false // positional data never needs to be normalized
                     );
                     if (h.HasValue) {
                         handles[handleIndex] = h.Value;
@@ -204,7 +204,8 @@ namespace GLTFast {
                             nrmInputByteStride,
                             (float3*)dest,
                             12,
-                            nrmAcc.normalized
+                            nrmAcc.normalized,
+                            false // morph target normals are deltas -> don't normalize
                         );
                         if (h.HasValue) {
                             handles[handleIndex] = h.Value;
@@ -251,7 +252,8 @@ namespace GLTFast {
                             tanInputByteStride,
                             (float3*)dest,
                             12,
-                            tanAcc.normalized
+                            tanAcc.normalized,
+                            false // morph target tangents are deltas -> don't normalize
                         );
                         if (h.HasValue) {
                             handles[handleIndex] = h.Value;

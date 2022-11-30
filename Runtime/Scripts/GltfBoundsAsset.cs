@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,14 +20,30 @@ using UnityEngine;
 
 namespace GLTFast
 {
+    using Logging;
+    using Materials;
+
+    /// <summary>
+    /// Base component for code-less loading of glTF files
+    /// Extends <seealso cref="GltfAsset"/> with bounding box calculation
+    /// </summary>
     public class GltfBoundsAsset : GltfAsset {
 
-        [Tooltip("Create a box collider encapsulating the glTF asset")]
+        /// <summary>
+        /// If true, a box collider encapsulating the glTF scene is created
+        /// (only if the built-in Physics module is enabled).
+        /// </summary>
+        [Tooltip("If true, a box collider encapsulating the glTF asset is created")]
         public bool createBoxCollider = true;
 
+        /// <summary>
+        /// Bounding box of the instantiated glTF scene
+        /// </summary>
         [NonSerialized]
         public Bounds bounds;
 
+        
+        /// <inheritdoc />
         public override async Task<bool> Load(
             string url,
             IDownloadProvider downloadProvider=null,
@@ -42,10 +58,14 @@ namespace GLTFast
                 var insta = (GameObjectBoundsInstantiator) GetDefaultInstantiator(logger);
                 // Auto-Instantiate
                 if (sceneId>=0) {
-                    success = importer.InstantiateScene(insta, sceneId);
+                    success = await importer.InstantiateSceneAsync(insta, sceneId);
+                    currentSceneId = success ? sceneId : (int?)null;
                 } else {
-                    success = importer.InstantiateMainScene(insta);
+                    success = await importer.InstantiateMainSceneAsync(insta);
+                    currentSceneId = importer.defaultSceneIndex;
                 }
+
+                sceneInstance = insta.sceneInstance;
 
                 if(success) {
                     SetBounds(insta);
@@ -54,17 +74,19 @@ namespace GLTFast
             return success;
         }
 
-        public override bool InstantiateScene(int sceneIndex, ICodeLogger logger = null) {
-            base.InstantiateScene(sceneIndex, logger);
+        /// <inheritdoc />
+        public override async Task<bool> InstantiateScene(int sceneIndex, ICodeLogger logger = null) {
             var instantiator = (GameObjectBoundsInstantiator)GetDefaultInstantiator(logger);
-            var success = base.InstantiateScene(sceneIndex, instantiator);
+            var success = await base.InstantiateScene(sceneIndex, instantiator);
             currentSceneId = success ? sceneIndex : (int?)null;
+            sceneInstance = instantiator.sceneInstance;
             if (success) {
                 SetBounds(instantiator);
             }
             return success;
         }
 
+        /// <inheritdoc />
         protected override IInstantiator GetDefaultInstantiator(ICodeLogger logger) {
             return new GameObjectBoundsInstantiator(importer, transform, logger);
         }

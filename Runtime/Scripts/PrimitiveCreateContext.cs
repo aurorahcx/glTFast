@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,64 +13,74 @@
 // limitations under the License.
 //
 
-using UnityEngine;
-using UnityEngine.Rendering;
-using Unity.Jobs;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+
+using Unity.Jobs;
 using UnityEngine.Profiling;
+using UnityEngine.Rendering;
+using UnityEngine;
 
 namespace GLTFast {
 
-    using Schema;
-
     class PrimitiveCreateContext : PrimitiveCreateContextBase {
 
-        public Mesh mesh;
         public VertexBufferConfigBase vertexData;
 
         public JobHandle jobHandle;
-        public int[][] indices;
+        int[][] m_Indices;
 
         public GCHandle calculatedIndicesHandle;
 
         public MeshTopology topology;
 
+        public PrimitiveCreateContext(int primitiveIndex, int materialCount, string meshName) 
+            : base(primitiveIndex, materialCount, meshName) 
+        {
+            m_Indices = new int[materialCount][];
+        }
+
+        public void SetIndices(int subMesh, int[] indices) {
+            m_Indices[subMesh] = indices;
+        }
+        
         public override bool IsCompleted => jobHandle.IsCompleted;
 
-        public override Primitive? CreatePrimitive() {
+        public override async Task<Primitive?> CreatePrimitive() {
             Profiler.BeginSample("CreatePrimitive");
             jobHandle.Complete();
-            var msh = new UnityEngine.Mesh();
-            msh.name = mesh.name;
+            var msh = new Mesh {
+                name = m_MeshName
+            };
 
-            vertexData.ApplyOnMesh(msh,defaultMeshUpdateFlags);
+            vertexData.ApplyOnMesh(msh);
 
             Profiler.BeginSample("SetIndices");
-            int indexCount = 0;
+            var indexCount = 0;
             var allBounds = vertexData.bounds;
-            for (int i = 0; i < indices.Length; i++) {
-                indexCount += indices[i].Length;
+            for (var i = 0; i < m_Indices.Length; i++) {
+                indexCount += m_Indices[i].Length;
             }
             Profiler.BeginSample("SetIndexBufferParams");
             msh.SetIndexBufferParams(indexCount,IndexFormat.UInt32); //TODO: UInt16 maybe?
             Profiler.EndSample();
-            msh.subMeshCount = indices.Length;
+            msh.subMeshCount = m_Indices.Length;
             indexCount = 0;
-            for (int i = 0; i < indices.Length; i++) {
+            for (var i = 0; i < m_Indices.Length; i++) {
                 Profiler.BeginSample("SetIndexBufferData");
-                msh.SetIndexBufferData(indices[i],0,indexCount,indices[i].Length,defaultMeshUpdateFlags);
+                msh.SetIndexBufferData(m_Indices[i],0,indexCount,m_Indices[i].Length,defaultMeshUpdateFlags);
                 Profiler.EndSample();
                 Profiler.BeginSample("SetSubMesh");
                 var subMeshDescriptor = new SubMeshDescriptor{
                     indexStart = indexCount,
-                    indexCount = indices[i].Length,
+                    indexCount = m_Indices[i].Length,
                     topology = topology,
                     baseVertex = 0,
                     firstVertex = 0,
                     vertexCount = vertexData.vertexCount
                 };
                 if (allBounds.HasValue) {
-                    // Setting the submeshes' bounds to the overall bounds
+                    // Setting the sub-meshes' bounds to the overall bounds
                     // Calculating the actual sub-mesh bounds (by iterating the verts referenced
                     // by the sub-mesh indices) would be slow. Also, hardly any glTFs re-use
                     // the same vertex buffer across primitives of a node (which is the
@@ -79,7 +89,7 @@ namespace GLTFast {
                 }
                 msh.SetSubMesh(i,subMeshDescriptor,defaultMeshUpdateFlags);
                 Profiler.EndSample();
-                indexCount += indices[i].Length;
+                indexCount += m_Indices[i].Length;
             }
             Profiler.EndSample();
 
@@ -110,7 +120,7 @@ namespace GLTFast {
             msh.UploadMeshData(false);
             Profiler.EndSample();
 #else
-            /// Don't upload explicitely. Unity takes care of upload on demand/deferred
+            // Don't upload explicitly. Unity takes care of upload on demand/deferred
 
             // Profiler.BeginSample("UploadMeshData");
             // msh.UploadMeshData(true);
@@ -118,7 +128,7 @@ namespace GLTFast {
 #endif
 
             if (morphTargetsContext != null) {
-                morphTargetsContext.ApplyOnMeshAndDispose(msh);
+                await morphTargetsContext.ApplyOnMeshAndDispose(msh);
             }
 
             Profiler.BeginSample("Dispose");
@@ -126,7 +136,8 @@ namespace GLTFast {
             Profiler.EndSample();
 
             Profiler.EndSample();
-            return new Primitive(msh,materials);
+
+            return new Primitive(msh,m_Materials);
         }
         
         void Dispose() {

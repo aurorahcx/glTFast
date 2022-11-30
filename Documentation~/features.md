@@ -1,15 +1,5 @@
 # Features
 
-## Overview
-
-- [x] Run-time import
-  - [x] GameObjects
-  - [x] ⚠️ Entities (see [DOTS](#data-oriented-technology-stack))
-- [x] Fast and small footprint JSON parsing
-- [x] Multi-threading via C# job system
-- [x] Design-time (Editor) import
-- [ ] Export
-
 ## Platforms
 
 All of Unity's platforms are supported. glTFast is tested or was reported to run on:
@@ -23,99 +13,120 @@ All of Unity's platforms are supported. glTFast is tested or was reported to run
 - Universal Windows Platform
 - Lumin (Magic Leap)
 
+## Workflows
+
+|          | Runtime | Editor (design-time)
+|----------| ------ | ------
+| | |
+| **GameObject**
+| Import   | ✅️ | ✅
+| Export   | [ℹ️][RuntimeExport] | <sup>1</sup> ☑️
+| | |
+| **Entities (see [DOTS](#data-oriented-technology-stack))**
+| Import   | [☑️](#data-oriented-technology-stack) | `n/a`
+| Export   |  | `n/a`
+
+<sup>1</sup>: glTF export currently only works on Unity 2020.2 or newer.
+
 ## Core glTF features
 
 The glTF 2.0 specification is fully supported, with only a few minor remarks.
 
-<details><summary>Detailed list of glTF 2.0 core feature support</summary>
-
-- [x] glTF (gltf + buffers + textures)
-- [x] glTF binary (glb)
-
-- [x] Scene
-  - [x] Node hierarchy
-  - [x] Camera
-- [x] Buffers
-  - [x] External URIs
-  - [x] glTF binary main buffer
-  - [x] Embed buffers or textures (base-64 encoded within JSON)
-- [x] Images
-  - [x] PNG
-  - [x] Jpeg
-  - [x] <sup>2</sup>KTX with Basis Universal super compression (via [KTX/Basis Texture Unity Package](https://github.com/atteneder/KtxUnity))
-- [x] Materials (see section [Materials](#materials) for details)
-  - [x] [Universal Render Pipeline (URP)][URP]
-  - [x] [High Definition Render Pipeline (HDRP)][HDRP]
-  - [x] Built-in Render Pipeline
-- Primitive Types
-  - [x] TRIANGLES
-  - [x] POINTS
-  - [x] <sup>1</sup>LINES
-  - [x] LINE_STRIP
-  - [x] <sup>1</sup>LINE_LOOP
-  - [ ] TRIANGLE_STRIP
-  - [ ] TRIANGLE_FAN
-- [x] Meshes
-  - [x] Positions
-  - [x] Normals
-  - [x] Tangents
-  - [x] Texture coordinates
-  - [x] Vertex colors
-  - [x] Draco mesh compression (via [Draco 3D Data Compression Unity Package](https://github.com/atteneder/DracoUnity))
-  - [x] Implicit (no) indices
-  - [x] Per primitive material
-  - [x] Two texture coordinates / UV sets
-    - [ ] Three or more texture coordinates / UV sets ([issue][UVsets])
-  - [x] Joints (up to 4 per vertex)
-  - [x] Weights (up to 4 per vertex)
-- [x] Texture sampler
-  - [x] Filtering (see ([limitations](#Known-issues)))
-  - [x] Wrap modes
-- [x] Morph targets
-- [x] <sup>3</sup>Sparse accessors
-- [x] [Skins][Skins] (sponsored by [Embibe](https://www.embibe.com))
-- [x] Animation
-  - [x] via legacy Animation System
-  - [ ] via Playable API ([issue][AnimationPlayables])
-  - [ ] via Mecanim ([issue][AnimationMecanim])
+| | Import | Export
+|------------| ------ | ------
+| **Format**
+|glTF (.gltf) | ✅ | ✅
+|glTF-Binary (.glb) | ✅ | ✅
+| | |
+| **Buffer**
+| External URIs | ✅ | ✅
+| GLB main buffer | ✅ | ✅
+| Embed buffers or textures (base-64 encoded within JSON) | ✅ |
+| [meshoptimizer compression][MeshOpt] (via [package][MeshOptPkg])| ✅ |
+| | |
+| **Basics**
+| Scenes | ✅ | ✅
+| Node hierarchies | ✅ | ✅
+| Cameras | ✅ | 
+| | |
+| **Images**
+| PNG | ✅ | ✅
+| Jpeg | ✅ | ✅
+| KTX with Basis Universal compression (via [KtxUnity](https://github.com/atteneder/KtxUnity)) | ✅ | 
+| | |
+| **Texture sampler**
+| Filtering  | ✅ with [limitations](./KnownIssues.md) | ✅ with [limitations](./KnownIssues.md) |
+| Wrap modes | ✅ | ✅ |
+| | |
+| **Materials Overview** (see [details](#materials-details))
+| [Universal Render Pipeline (URP)][URP] | ✅ | ☑️ |
+| [High Definition Render Pipeline (HDRP)][HDRP] | ✅ | ☑️ |
+| Built-in Render Pipeline | ✅ | ☑️ |
+| | |
+| **Topologies / Primitive Types**
+| TRIANGLES | ✅ | ✅
+| POINTS | ✅ | ✅
+| <sup>1</sup>LINES | ✅ | ✅
+| LINE_STRIP | ✅ | ✅
+| <sup>1</sup>LINE_LOOP | ✅ | ✅
+| TRIANGLE_STRIP |  | 
+| TRIANGLE_FAN |  | 
+| Quads | `n/a` | ✅ via triangulation
+| | |
+| **Meshes**
+| Positions | ✅ | ✅
+| Normals | ✅ | ✅
+| Tangents | ✅ | ✅
+| Texture coordinates / UV sets | ✅ | `?`
+| Three or more texture coordinates / UV sets | [issue][UVsets] | `?`
+| Vertex colors | ✅ | `?`
+| Draco mesh compression (via [DracoUnity](https://github.com/atteneder/DracoUnity)) | ✅ | 
+| Implicit (no) indices | ✅ | 
+| Per primitive material | ✅ | ✅
+| Joints (up to 4 per vertex) | ✅ | 
+| Weights (up to 4 per vertex) | ✅ | 
+| | |
+| **Morph Targets / Blend Shapes**
+| Sparse accessors | <sup>2</sup> ✅ | 
+| [Skins][Skins] (sponsored by [Embibe](https://www.embibe.com)) | ✅ | 
+| | |
+| **Animation** 
+| via legacy Animation System | ✅ | 
+| via Playable API ([issue][AnimationPlayables]) |  | 
+| via Mecanim ([issue][AnimationMecanim]) |  | 
 
 <sup>1</sup>: Untested due to lack of demo files.
 
-<sup>2</sup>: Beta
-
-<sup>3</sup>: Not on all accessor types; morph targets and vertex positions only
-
-</details>
+<sup>2</sup>: Not on all accessor types; morph targets and vertex positions only
 
 ## Extensions
 
 ### Official Khronos extensions
 
-- [x] KHR_draco_mesh_compression
-- [x] KHR_materials_pbrSpecularGlossiness
-- [x] KHR_materials_unlit
-- [x] KHR_texture_transform
-- [x] KHR_mesh_quantization
-- [x] KHR_texture_basisu
-- [ ] KHR_lights_punctual ([issue][PointLights])
-- [ ] KHR_materials_clearcoat ([issue][ClearCoat])
-- [ ] KHR_materials_sheen ([issue][Sheen])
-- [ ] KHR_materials_transmission ([issue][Transmission])
-- [ ] KHR_materials_variants ([issue][Variants])
-- [ ] KHR_materials_ior ([issue][IOR])
-- [ ] KHR_materials_specular ([issue][Specular])
-- [ ] KHR_materials_volume ([issue][Volume])
-- [ ] KHR_xmp
-
-Will not be supported:
-
-- KHR_techniques_webgl
-
-### Vendor extensions
-
-- [x] <sup>1</sup>EXT_mesh_gpu_instancing
-- [ ] EXT_meshopt_compression ([issue][MeshOpt])
-- [ ] EXT_lights_image_based ([issue][IBL])
+| | Import | Export
+|------------| ------ | ------
+| | |
+| **Khronos**
+| KHR_draco_mesh_compression | ✅ | 
+| KHR_materials_pbrSpecularGlossiness | ✅ | 
+| KHR_materials_unlit | ✅ | ✅
+| KHR_texture_transform | ✅ | ✅
+| KHR_mesh_quantization | ✅ | 
+| KHR_texture_basisu | ✅ | 
+| KHR_lights_punctual | ✅ | ✅
+| KHR_materials_clearcoat | [ℹ️][ClearCoat] | 
+| KHR_materials_sheen | [ℹ️][Sheen] | 
+| KHR_materials_transmission | [ℹ️][Transmission] | 
+| KHR_materials_variants | [ℹ️][Variants] | 
+| KHR_materials_ior | [ℹ️][IOR] | 
+| KHR_materials_specular | [ℹ️][Specular] | 
+| KHR_materials_volume | [ℹ️][Volume] | 
+| KHR_xmp_json_ld |️ |
+| | |
+| **Vendor**
+| <sup>1</sup>EXT_mesh_gpu_instancing | ✅ | 
+| EXT_meshopt_compression | ✅ | 
+| EXT_lights_image_based | [ℹ️][IBL] | 
 
 <sup>1</sup>: Without support for custom vertex attributes (e.g. `_ID`)
 
@@ -128,15 +139,19 @@ Not investigated yet:
 - MSFT_packing_normalRoughnessMetallic
 - MSFT_packing_occlusionRoughnessMetallic
 
-Will not be supported:
+ Will not become supported (reason in brackets):
 
+- KHR_xmp (archived; prefer KHR_xmp_json_ld)
+- KHR_techniques_webgl (archived)
 - ADOBE_materials_clearcoat_specular (prefer KHR_materials_clearcoat)
 - ADOBE_materials_thin_transparency (prefer KHR_materials_transmission)
 - EXT_texture_webp (prefer KTX/basisu)
 - FB_geometry_metadata (prefer KTX_xmp)
 - MSFT_texture_dds (prefer KTX/basisu)
 
-## Materials
+## Materials Details
+
+### Material Import
 
 | Material Feature              | URP | HDRP | Built-In |
 |-------------------------------|-----|------|----------|
@@ -151,13 +166,14 @@ Will not be supported:
 | Vertex colors                 | ✅  | ✅   | ✅       |
 | Multiple UV sets              | ✅<sup>2</sup>  | ✅<sup>2</sup>   | ✅<sup>2</sup>       |
 | Texture Transform             | ✅  | ✅   | ✅       |
-| Clear coat                    | [ℹ][ClearCoat] | [ℹ][ClearCoat] | [❌][ClearCoat] |
-| Sheen                         | [ℹ][Sheen] | [ℹ][Sheen] | [❌][Sheen] |
-| Transmission                  | [✓][Transmission]<sup>3</sup> | [✓][Transmission]<sup>4</sup> | [✓][Transmission]<sup>4</sup> |
-| Variants                      | [ℹ][Variants] | [ℹ][Variants] | [ℹ][Variants] |
-| IOR                           | [ℹ][IOR]      | [ℹ][IOR]      | [❌][IOR]      |
-| Specular                      | [ℹ][Specular] | [ℹ][Specular] | [❌][Specular] |
-| Volume                        | [ℹ][Volume]   | [ℹ][Volume]   | [❌][Volume]   |
+| Clear coat                    | [ℹ️][ClearCoat] | [ℹ️][ClearCoat] | [⛔️][ClearCoat] |
+| Sheen                         | [ℹ️][Sheen] | [ℹ️][Sheen] | [⛔️][Sheen] |
+| Transmission                  | [☑️][Transmission]<sup>3</sup> | [☑️][Transmission]<sup>4</sup> | [☑️][Transmission]<sup>4</sup> |
+| Variants                      | [ℹ️][Variants] | [ℹ️][Variants] | [ℹ️][Variants] |
+| IOR                           | [ℹ️][IOR]      | [ℹ️][IOR]      | [⛔️][IOR]      |
+| Specular                      | [ℹ️][Specular] | [ℹ️][Specular] | [⛔️][Specular] |
+| Volume                        | [ℹ️][Volume]   | [ℹ️][Volume]   | [⛔️][Volume]   |
+| Point clouds                  |      |     | Unlit only |
 
 <sup>1</sup>: Physically-Based Rendering (PBR) material model
 
@@ -167,18 +183,51 @@ Will not be supported:
 
 <sup>4</sup>: Transmission in Built-In and HD render pipeline does not support transmission textures and is only 100% correct in certain cases like clear glass (100% transmission, white base color). Otherwise it's an approximation.
 
-Legend:
+### Material Export
 
-- ✅ Fully supported
-- ✓ Supported partially
-- ℹ Planned (click for issue)
-- ❌ No plan to support (click to create issue)
+Material export is currently only tested on the following shaders:
+
+- Universal and High Definition render pipeline
+  - `Lit` 
+  - `Unlit` 
+- Built-In render pipeline
+  - `Standard` 
+  - `Unlit` 
+
+Other shaders might (partially) work if they have similar properties (with identical names).
+
+| Material Feature              | URP<sup>1</sup> | HDRP<sup>2</sup> | Built-In<sup>3</sup> |
+|-------------------------------|-----|------|----------|
+| PBR Metallic-Roughness        | ✅ | ✅ | ✅ |
+| PBR Specular-Glossiness       |  |  |  |
+| Unlit                         | ✅ | ✅ | ✅ |
+| Normal texture                | ✅ | ✅ | ✅ |
+| Occlusion texture             | ✅ | ✅ | ✅ |
+| Emission texture              | ✅ | ✅ | ✅ |
+| Alpha modes OPAQUE/MASK/BLEND | ✅ | ✅ | ✅ |
+| Double sided / Two sided      | ✅ | ✅ | ✅ |
+| Vertex colors                 | `?` | `?` | `?` |
+| Multiple UV sets              | `?` | `?` | `?` |
+| Texture Transform             | ✅ | ✅ | ✅ |
+| Clear coat                    |  |  | `n/a` |
+| Sheen                         | `?` | `?` | `n/a` |
+| Transmission                  |  |  | `n/a` |
+| Variants                      |  |  |  |
+| IOR                           |  |  | `n/a` |
+| Specular                      |  |  |  |
+| Volume                        |  |  | `n/a` |
+
+<sup>1</sup>: Universal Render Pipeline Lit Shader
+
+<sup>2</sup>: High Definition Render Pipeline Lit Shader
+
+<sup>3</sup>: Built-In Render Pipeline Standard and Unlit Shader
 
 ## Data-Oriented Technology Stack
 
 > ⚠️ Note: DOTS is highly experimental and many features don't work yet. Do not use it for production ready projects!
 
-Unity's [Data-Oriented Technology Stack (DOTS)][DOTS] allows users to create high performance gameplay. glTFast has initial, experimental support for it.
+Unity's [Data-Oriented Technology Stack (DOTS)][DOTS] allows users to create high performance gameplay. glTFast has experimental import support for it.
 
 Instead of traditional GameObjects, glTFast will instantiate Entities with Hybrid Renderer (version 2) components.
 
@@ -188,6 +237,7 @@ Possibly incomplete list of things that are known to not work with Entities yet:
 - Skinning
 - Morph targets
 - Cameras
+- Lights
 
 ### DOTS Setup
 
@@ -196,15 +246,18 @@ Possibly incomplete list of things that are known to not work with Entities yet:
 - Use `GltfEntityAsset` instead of `GltfAsset`
 - For customized behavior, use the `EntityInstantiator` instead of the `GameObjectInstantiator`
 
-## Known issues
+## Unity Version Support
 
-- <sup>1</sup>Vertex accessors (positions, normals, etc.) that are used across meshes are duplicated and result in higher memory usage and slower loading (see [this comment](https://github.com/atteneder/glTFast/issues/52#issuecomment-583837852))
-- <sup>1</sup>When using more than one samplers on an image, that image is duplicated and results in higher memory usage
-- Texture sampler minification/magnification filter limitations (see [issue][SamplerFilter]):
-  - <sup>1</sup>There's no differentiation between `minFilter` and `magFilter`. `minFilter` settings are prioritized.
-  - <sup>1</sup>`minFilter` mode `NEAREST_MIPMAP_LINEAR` is not supported and will result in `NEAREST`.
+*glTFast* requires Unity 2019.4 or newer.
 
-<sup>1</sup>: A Unity API limitation.
+## Legend
+
+- ✅ Fully supported
+- ☑️ Partially supported
+- ℹ️ Planned (click for issue)
+- ⛔️ No plan to support (click for issue)
+- `?`: Unknown / Untested
+- `n/a`: Not available
 
 [AnimationMecanim]: https://github.com/atteneder/glTFast/issues/167
 [AnimationPlayables]: https://github.com/atteneder/glTFast/issues/166  
@@ -213,12 +266,13 @@ Possibly incomplete list of things that are known to not work with Entities yet:
 [HDRP]: https://unity.com/srp/High-Definition-Render-Pipeline
 [IBL]: https://github.com/atteneder/glTFast/issues/108
 [IOR]: https://github.com/atteneder/glTFast/issues/207
-[MeshOpt]: https://github.com/atteneder/glTFast/issues/106
+[MeshOpt]: https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Vendor/EXT_meshopt_compression
+[MeshOptPkg]: https://docs.unity3d.com/Packages/com.unity.meshopt.decompress@0.1/manual/index.html
 [newIssue]: https://github.com/atteneder/glTFast/issues/new
-[PointLights]: https://github.com/atteneder/glTFast/issues/17
+[RuntimeExport]: https://github.com/atteneder/glTFast/issues/259
 [SamplerFilter]: https://github.com/atteneder/glTFast/issues/61 
 [Sheen]: https://github.com/atteneder/glTFast/issues/110
-[Skins]: https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#skins
+[Skins]: https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#skins
 [Specular]: https://github.com/atteneder/glTFast/issues/208
 [Transmission]: https://github.com/atteneder/glTFast/issues/111
 [URP]: https://unity.com/srp/universal-render-pipeline

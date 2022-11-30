@@ -19,42 +19,42 @@ Shader "glTF/PbrMetallicRoughness"
 {
     Properties
     {
-        _Color("Color", Color) = (1,1,1,1)
-        _MainTex("Base Color Map", 2D) = "white" {}
-        _MainTexRotation ("Base Color Map Rotation", Vector) = (0,0,0,0)
-        [Enum(UV0,0,UV1,1)] _MainTexUVChannel ("Base Color Map UV Set", Float) = 0
+        [MainColor] baseColorFactor("Base Color", Color) = (1,1,1,1)
+        [MainTexture] baseColorTexture("Base Color Tex", 2D) = "white" {}
+        baseColorTexture_Rotation ("Base Color Tex Rotation", Vector) = (0,0,0,0)
+        [Enum(UV0,0,UV1,1)] baseColorTexture_texCoord ("Base Color Tex UV", Float) = 0
         
-        _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
+        alphaCutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
 
-        _Roughness("Rougness", Range(0.0, 1.0)) = 1
+        roughnessFactor("Roughness", Range(0.0, 1.0)) = 1
         // _GlossMapScale("Smoothness Scale", Range(0.0, 1.0)) = 1.0
         // [Enum(Metallic Alpha,0,Albedo Alpha,1)] _SmoothnessTextureChannel ("Smoothness texture channel", Float) = 0
 
-        [Gamma] _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
-        _MetallicGlossMap("Metallic/Roughness Map", 2D) = "white" {}
-        _MetallicGlossMapRotation ("Metallic/Roughness Map Rotation", Vector) = (0,0,0,0)
-        [Enum(UV0,0,UV1,1)] _MetallicGlossMapUVChannel ("Metallic/Roughness Map UV Set", Float) = 0
+        [Gamma] metallicFactor("Metallic", Range(0.0, 1.0)) = 1.0
+        metallicRoughnessTexture("Metallic-Roughness Tex", 2D) = "white" {}
+        metallicRoughnessTexture_Rotation ("Metallic-Roughness Map Rotation", Vector) = (0,0,0,0)
+        [Enum(UV0,0,UV1,1)] metallicRoughnessTexture_texCoord ("Metallic-Roughness Tex UV", Float) = 0
 
         // [ToggleOff] _SpecularHighlights("Specular Highlights", Float) = 1.0
         // [ToggleOff] _GlossyReflections("Glossy Reflections", Float) = 1.0
 
-        _BumpScale("Normal Scale", Float) = 1.0
-        [Normal] _BumpMap("Normal Map", 2D) = "bump" {}
-        _BumpMapRotation ("Normal Map Rotation", Vector) = (0,0,0,0)
-        [Enum(UV0,0,UV1,1)] _BumpMapUVChannel ("Normal Map UV Set", Float) = 0
+        normalTexture_scale("Normal Scale", Float) = 1.0
+        [Normal] normalTexture("Normal Tex", 2D) = "bump" {}
+        normalTexture_Rotation ("Normal Tex Rotation", Vector) = (0,0,0,0)
+        [Enum(UV0,0,UV1,1)] normalTexture_texCoord ("Normal Tex UV", Float) = 0
 
         // _Parallax ("Height Scale", Range (0.005, 0.08)) = 0.02
         // _ParallaxMap ("Height Map", 2D) = "black" {}
 
-        _OcclusionStrength("Occlusion Strength", Range(0.0, 1.0)) = 1.0
-        _OcclusionMap("Occlusion Map", 2D) = "white" {}
-        _OcclusionMapRotation ("Occlusion Map Rotation", Vector) = (0,0,0,0)
-        [Enum(UV0,0,UV1,1)] _OcclusionMapUVChannel ("Occlusion Map UV Set", Float) = 0
+        occlusionTexture_strength("Occlusion Strength", Range(0.0, 1.0)) = 1.0
+        occlusionTexture("Occlusion Tex", 2D) = "white" {}
+        occlusionTexture_Rotation ("Occlusion Tex Rotation", Vector) = (0,0,0,0)
+        [Enum(UV0,0,UV1,1)] occlusionTexture_texCoord ("Occlusion Tex UV", Float) = 0
         
-        _EmissionColor("Color", Color) = (0,0,0)
-        _EmissionMap("Emission Map", 2D) = "white" {}
-        _EmissionMapRotation ("Emission Map Rotation", Vector) = (0,0,0,0)
-        [Enum(UV0,0,UV1,1)] _EmissionMapUVChannel ("Emission Map UV Set", Float) = 0
+        [HDR] emissiveFactor("Emissive", Color) = (0,0,0)
+        emissiveTexture("Emission Tex", 2D) = "white" {}
+        emissiveTexture_Rotation ("Emission Tex Rotation", Vector) = (0,0,0,0)
+        [Enum(UV0,0,UV1,1)] emissiveTexture_texCoord ("Emission Tex UV", Float) = 0
         
         // _DetailMask("Detail Mask", 2D) = "white" {}
 
@@ -106,7 +106,7 @@ Shader "glTF/PbrMetallicRoughness"
             #pragma shader_feature_local _ _ALPHATEST_ON _ALPHABLEND_ON _ALPHAPREMULTIPLY_ON
             #pragma shader_feature_local _METALLICGLOSSMAP
             #pragma shader_feature_local _OCCLUSION
-            #pragma shader_feature_local _UV_ROTATION
+            #pragma shader_feature_local _TEXTURE_TRANSFORM
             // #pragma shader_feature_local _DETAIL_MULX2
             // #pragma shader_feature_local _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             // #pragma shader_feature_local _SPECULARHIGHLIGHTS_OFF
@@ -148,7 +148,7 @@ Shader "glTF/PbrMetallicRoughness"
             #pragma shader_feature_local _ _ALPHATEST_ON _ALPHABLEND_ON _ALPHAPREMULTIPLY_ON
             #pragma shader_feature_local _METALLICGLOSSMAP
             #pragma shader_feature_local _OCCLUSION
-            #pragma shader_feature_local _UV_ROTATION
+            #pragma shader_feature_local _TEXTURE_TRANSFORM
             // #pragma shader_feature_local _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             // #pragma shader_feature_local _SPECULARHIGHLIGHTS_OFF
             // #pragma shader_feature_local _DETAIL_MULX2
@@ -182,7 +182,7 @@ Shader "glTF/PbrMetallicRoughness"
             #pragma shader_feature_local _ _ALPHATEST_ON _ALPHABLEND_ON _ALPHAPREMULTIPLY_ON
             #pragma shader_feature_local _METALLICGLOSSMAP
             #pragma shader_feature_local _OCCLUSION
-            #pragma shader_feature_local _UV_ROTATION
+            #pragma shader_feature_local _TEXTURE_TRANSFORM
             // #pragma shader_feature_local _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             // #pragma shader_feature_local _PARALLAXMAP
             #pragma multi_compile_shadowcaster
@@ -218,7 +218,7 @@ Shader "glTF/PbrMetallicRoughness"
             #pragma shader_feature_local _ _ALPHATEST_ON _ALPHABLEND_ON _ALPHAPREMULTIPLY_ON
             #pragma shader_feature_local _METALLICGLOSSMAP
             #pragma shader_feature_local _OCCLUSION
-            #pragma shader_feature_local _UV_ROTATION
+            #pragma shader_feature_local _TEXTURE_TRANSFORM
             // #pragma shader_feature_local _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             // #pragma shader_feature_local _SPECULARHIGHLIGHTS_OFF
             // #pragma shader_feature_local _DETAIL_MULX2
@@ -256,7 +256,7 @@ Shader "glTF/PbrMetallicRoughness"
 
             #pragma shader_feature_local _METALLICGLOSSMAP
             #pragma shader_feature_local _OCCLUSION
-            #pragma shader_feature_local _UV_ROTATION
+            #pragma shader_feature_local _TEXTURE_TRANSFORM
             // #pragma shader_feature_local _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             // #pragma shader_feature_local _DETAIL_MULX2
             #pragma shader_feature EDITOR_VISUALIZATION
@@ -291,7 +291,7 @@ Shader "glTF/PbrMetallicRoughness"
             #pragma shader_feature_local _ _ALPHATEST_ON _ALPHABLEND_ON _ALPHAPREMULTIPLY_ON
             #pragma shader_feature_local _METALLICGLOSSMAP
             #pragma shader_feature_local _OCCLUSION
-            #pragma shader_feature_local _UV_ROTATION
+            #pragma shader_feature_local _TEXTURE_TRANSFORM
             // #pragma shader_feature_local _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             // #pragma shader_feature_local _SPECULARHIGHLIGHTS_OFF
             // #pragma shader_feature_local _GLOSSYREFLECTIONS_OFF
@@ -330,7 +330,7 @@ Shader "glTF/PbrMetallicRoughness"
             #pragma shader_feature_local _ _ALPHATEST_ON _ALPHABLEND_ON _ALPHAPREMULTIPLY_ON
             #pragma shader_feature_local _METALLICGLOSSMAP
             #pragma shader_feature_local _OCCLUSION
-            #pragma shader_feature_local _UV_ROTATION
+            #pragma shader_feature_local _TEXTURE_TRANSFORM
             // #pragma shader_feature_local _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             // #pragma shader_feature_local _SPECULARHIGHLIGHTS_OFF
             // #pragma shader_feature_local _DETAIL_MULX2
@@ -361,7 +361,7 @@ Shader "glTF/PbrMetallicRoughness"
             #pragma shader_feature_local _ _ALPHATEST_ON _ALPHABLEND_ON _ALPHAPREMULTIPLY_ON
             #pragma shader_feature_local _METALLICGLOSSMAP
             #pragma shader_feature_local _OCCLUSION
-            #pragma shader_feature_local _UV_ROTATION
+            #pragma shader_feature_local _TEXTURE_TRANSFORM
             // #pragma shader_feature_local _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             #pragma skip_variants SHADOWS_SOFT
             #pragma multi_compile_shadowcaster
@@ -392,7 +392,7 @@ Shader "glTF/PbrMetallicRoughness"
 
             #pragma shader_feature_local _METALLICGLOSSMAP
             #pragma shader_feature_local _OCCLUSION
-            #pragma shader_feature_local _UV_ROTATION
+            #pragma shader_feature_local _TEXTURE_TRANSFORM
             // #pragma shader_feature_local _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             // #pragma shader_feature_local _DETAIL_MULX2
             #pragma shader_feature EDITOR_VISUALIZATION

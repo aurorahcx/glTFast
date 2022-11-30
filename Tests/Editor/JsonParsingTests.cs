@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ using UnityEngine;
 
 namespace GLTFast.Tests
 {
-    public class JsonParsingTests
+    class JsonParsingTests
     {
         [Test]
         public void MaterialExtensions() {
@@ -316,8 +316,8 @@ namespace GLTFast.Tests
 
             var sampler0 = gltf.samplers[0];
             Assert.NotNull(sampler0);
-            Assert.AreEqual(Sampler.MagFilterMode.Linear,sampler0.magFilter);
-            Assert.AreEqual(Sampler.MinFilterMode.NearestMipmapLinear,sampler0.minFilter);
+            Assert.AreEqual(Sampler.MagFilterMode.None,sampler0.magFilter);
+            Assert.AreEqual(Sampler.MinFilterMode.None,sampler0.minFilter);
             
             var sampler1 = gltf.samplers[1];
             Assert.NotNull(sampler1);
@@ -336,22 +336,22 @@ namespace GLTFast.Tests
             
             var sampler4 = gltf.samplers[4];
             Assert.NotNull(sampler4);
-            Assert.AreEqual(Sampler.MagFilterMode.Linear,sampler4.magFilter);
+            Assert.AreEqual(Sampler.MagFilterMode.None,sampler4.magFilter);
             Assert.AreEqual(Sampler.MinFilterMode.NearestMipmapNearest,sampler4.minFilter);
             
             var sampler5 = gltf.samplers[5];
             Assert.NotNull(sampler5);
-            Assert.AreEqual(Sampler.MagFilterMode.Linear,sampler5.magFilter);
+            Assert.AreEqual(Sampler.MagFilterMode.None,sampler5.magFilter);
             Assert.AreEqual(Sampler.MinFilterMode.LinearMipmapNearest,sampler5.minFilter);
 
             var sampler6 = gltf.samplers[6];
             Assert.NotNull(sampler6);
-            Assert.AreEqual(Sampler.MagFilterMode.Linear,sampler6.magFilter);
+            Assert.AreEqual(Sampler.MagFilterMode.None,sampler6.magFilter);
             Assert.AreEqual(Sampler.MinFilterMode.NearestMipmapLinear,sampler6.minFilter);
 
             var sampler7 = gltf.samplers[7];
             Assert.NotNull(sampler7);
-            Assert.AreEqual(Sampler.MagFilterMode.Linear,sampler7.magFilter);
+            Assert.AreEqual(Sampler.MagFilterMode.None,sampler7.magFilter);
             Assert.AreEqual(Sampler.MinFilterMode.LinearMipmapLinear,sampler7.minFilter);
 
         }
@@ -389,6 +389,27 @@ namespace GLTFast.Tests
                 }
             },
             ""name"": ""Node3""
+        },
+        {
+            ""extensions"": {
+                ""KHR_lights_punctual"": {
+                    ""light"": 42
+                }
+            },
+            ""name"": ""Node4""
+        },
+        {
+            ""extensions"": {
+                ""EXT_mesh_gpu_instancing"": {
+                    ""attributes"": {
+                        ""TRANSLATION"": 13
+                    }
+                },
+                ""KHR_lights_punctual"": {
+                    ""light"": 42
+                }
+            },
+            ""name"": ""Node5""
         }
     ]
 }
@@ -397,7 +418,7 @@ namespace GLTFast.Tests
             
             Assert.NotNull(gltf);
             Assert.NotNull(gltf.nodes,"No nodes");
-            Assert.AreEqual(4, gltf.nodes.Length, "Invalid nodes quantity");
+            Assert.AreEqual(6, gltf.nodes.Length, "Invalid nodes quantity");
 
             var node0 = gltf.nodes[0];
             Assert.NotNull(node0);
@@ -417,6 +438,32 @@ namespace GLTFast.Tests
             Assert.NotNull(node3.extensions.EXT_mesh_gpu_instancing);
             Assert.NotNull(node3.extensions.EXT_mesh_gpu_instancing.attributes);
             Assert.AreEqual(42,node3.extensions.EXT_mesh_gpu_instancing.attributes.TRANSLATION);
+            Assert.IsNull(node3.extensions.KHR_lights_punctual);
+            
+            var node4 = gltf.nodes[4];
+            Assert.NotNull(node4);
+            Assert.NotNull(node4.extensions);
+            Assert.IsNull(node4.extensions.EXT_mesh_gpu_instancing);
+            Assert.NotNull(node4.extensions.KHR_lights_punctual);
+            Assert.AreEqual(42,node4.extensions.KHR_lights_punctual.light);
+            
+            var node5 = gltf.nodes[5];
+            Assert.NotNull(node5);
+            Assert.NotNull(node5.extensions);
+            Assert.NotNull(node5.extensions.EXT_mesh_gpu_instancing);
+            Assert.NotNull(node5.extensions.EXT_mesh_gpu_instancing.attributes);
+            Assert.AreEqual(13,node5.extensions.EXT_mesh_gpu_instancing.attributes.TRANSLATION);
+            Assert.NotNull(node5.extensions.KHR_lights_punctual);
+            Assert.AreEqual(42,node5.extensions.KHR_lights_punctual.light);
+        }
+
+        [Test]
+        public void ParseGarbage() {
+            var gltf = JsonParser.ParseJson(@"");
+            Assert.IsNull(gltf);
+            
+            gltf = JsonParser.ParseJson(@"garbage");
+            Assert.IsNull(gltf);
         }
     }
 }

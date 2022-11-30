@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,8 +15,12 @@
 
 namespace GLTFast.Schema {
 
+    /// <summary>
+    /// An object defining the hierarchy relations and the local transform of
+    /// its content.
+    /// </summary>
     [System.Serializable]
-    public class Node : RootChild {
+    public class Node : NamedObject {
 
         /// <summary>
         /// The indices of this node's children.
@@ -64,14 +68,83 @@ namespace GLTFast.Schema {
         /// </summary>
         public int camera = -1;
 
+        /// <inheritdoc cref="NodeExtensions"/>
         public NodeExtensions extensions;
+        
+        internal void GltfSerialize(JsonWriter writer) {
+            writer.AddObject();
+            GltfSerializeRoot(writer);
+
+            if (children != null) {
+                writer.AddArrayProperty("children", children);
+            }
+
+            if (mesh >= 0) {
+                writer.AddProperty("mesh", mesh);
+            }
+            
+            if (translation!=null) {
+                writer.AddArrayProperty("translation", translation);
+            }
+            
+            if (rotation!=null) {
+                writer.AddArrayProperty("rotation", rotation);
+            }
+            
+            if (scale!=null) {
+                writer.AddArrayProperty("scale", scale);
+            }
+            
+            if (matrix!=null) {
+                writer.AddArrayProperty("matrix", matrix);
+            }
+            
+            if (skin >= 0) {
+                writer.AddProperty("skin", skin);
+            }
+            
+            if (camera >= 0) {
+                writer.AddProperty("camera", camera);
+            }
+
+            if (extensions != null) {
+                writer.AddProperty("extensions");
+                extensions.GltfSerialize(writer);
+            }
+            writer.Close();
+        }
     }
     
+    /// <summary>
+    /// Node extensions
+    /// </summary>
     [System.Serializable]
     public class NodeExtensions {
+        // Names are identical to glTF specified properties, that's why
+        // inconsistent names are ignored.
+        // ReSharper disable InconsistentNaming
+        
+        /// <inheritdoc cref="MeshGpuInstancing"/>
         public MeshGpuInstancing EXT_mesh_gpu_instancing;
+        /// <inheritdoc cref="LightsPunctual"/>
+        public NodeLightsPunctual KHR_lights_punctual;
+        
         // Whenever an extension is added, the JsonParser
         // (specifically step four of JsonParser.ParseJson)
         // needs to be updated!
+
+        // ReSharper restore InconsistentNaming
+        internal void GltfSerialize(JsonWriter writer) {
+            writer.AddObject();
+            if (EXT_mesh_gpu_instancing != null) {
+                writer.AddProperty("EXT_mesh_gpu_instancing");
+                EXT_mesh_gpu_instancing.GltfSerialize(writer);
+            }
+            if (KHR_lights_punctual != null) {
+                writer.AddProperty("KHR_lights_punctual");
+                KHR_lights_punctual.GltfSerialize(writer);
+            }
+            writer.Close();
+        }
     }
 }

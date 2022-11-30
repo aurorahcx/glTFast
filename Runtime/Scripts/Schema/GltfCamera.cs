@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,11 +18,23 @@ using UnityEngine;
 
 namespace GLTFast.Schema {
     
+    /// <summary>
+    /// A camera’s projection
+    /// </summary>
     [Serializable]
-    public class Camera : RootChild {
+    public class Camera : NamedObject {
 
+        /// <summary>
+        /// Camera projection type
+        /// </summary>
         public enum Type {
+            /// <summary>
+            /// Orthogonal projection
+            /// </summary>
             Orthographic,
+            /// <summary>
+            ///  Perspective projection
+            /// </summary>
             Perspective
         }
         
@@ -31,6 +43,9 @@ namespace GLTFast.Schema {
 
         Type? _typeEnum;
         
+        /// <summary>
+        /// <see cref="Type"/> typed view onto <see cref="type"/> string. 
+        /// </summary>
         public Type typeEnum {
             get {
                 if (_typeEnum.HasValue) {
@@ -45,12 +60,37 @@ namespace GLTFast.Schema {
                 if (perspective != null) _typeEnum = Type.Perspective;
                 return _typeEnum.Value;
             }
+            set {
+                type = null;
+                _typeEnum = value;
+            }
         }
         
+        /// <inheritdoc cref="CameraOrthographic"/>
         public CameraOrthographic orthographic;
+        
+        /// <inheritdoc cref="CameraOrthographic"/>
         public CameraPerspective perspective;
+        
+        internal void GltfSerialize(JsonWriter writer) {
+            writer.AddObject();
+            GltfSerializeRoot(writer);
+            writer.AddProperty("type", _typeEnum.ToString().ToLower());
+            if(perspective!=null) {
+                writer.AddProperty("perspective");
+                perspective.GltfSerialize(writer);
+            }
+            if(orthographic!=null) {
+                writer.AddProperty("orthographic");
+                orthographic.GltfSerialize(writer);
+            }
+            writer.Close();
+        }
     }
 
+    /// <summary>
+    /// An orthographic camera containing properties to create an orthographic projection matrix.
+    /// </summary>
     [Serializable]
     public class CameraOrthographic {
         
@@ -73,8 +113,20 @@ namespace GLTFast.Schema {
         /// The floating-point distance to the near clipping plane.
         /// </summary>
         public float znear;
+        
+        internal void GltfSerialize(JsonWriter writer) {
+            writer.AddObject();
+            writer.AddProperty("xmag", xmag);
+            writer.AddProperty("ymag", ymag);
+            writer.AddProperty("zfar", zfar);
+            writer.AddProperty("znear", znear);
+            writer.Close();
+        }
     }
     
+    /// <summary>
+    /// A perspective camera containing properties to create a perspective projection matrix.
+    /// </summary>
     [Serializable]
     public class CameraPerspective {
         
@@ -97,5 +149,18 @@ namespace GLTFast.Schema {
         /// The floating-point distance to the near clipping plane.
         /// </summary>
         public float znear;
+        
+        internal void GltfSerialize(JsonWriter writer) {
+            writer.AddObject();
+            if (aspectRatio > 0) {
+                writer.AddProperty("aspectRatio", aspectRatio);
+            }
+            writer.AddProperty("yfov", yfov);
+            if (zfar < float.MaxValue) {
+                writer.AddProperty("zfar", zfar);
+            }
+            writer.AddProperty("znear", znear);
+            writer.Close();
+        }
     }
 }

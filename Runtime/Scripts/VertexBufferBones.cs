@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,7 +13,9 @@
 // limitations under the License.
 //
 
+using System;
 using System.IO;
+using GLTFast.Jobs;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
@@ -25,8 +27,9 @@ using UnityEngine.Rendering;
 
 namespace GLTFast {
 
-    using Vertex;
+    using Logging;
     using Schema;
+    using Vertex;
 
     abstract class VertexBufferBonesBase {
         
@@ -36,12 +39,11 @@ namespace GLTFast {
             this.logger = logger;
         }
 
-        public abstract bool ScheduleVertexBonesJob(
+        public abstract JobHandle? ScheduleVertexBonesJob(
             IGltfBuffers buffers,
             int weightsAccessorIndex,
-            int jointsAccessorIndex,
-            NativeSlice<JobHandle> handles
-            );
+            int jointsAccessorIndex
+        );
         public abstract void AddDescriptors(VertexAttributeDescriptor[] dst, int offset, int stream);
         public abstract void ApplyOnMesh(UnityEngine.Mesh msh, int stream, MeshUpdateFlags flags = PrimitiveCreateContextBase.defaultMeshUpdateFlags);
         public abstract void Dispose();
@@ -52,12 +54,11 @@ namespace GLTFast {
 
         public VertexBufferBones(ICodeLogger logger) : base(logger) {}
         
-        public override unsafe bool ScheduleVertexBonesJob(
+        public override unsafe JobHandle? ScheduleVertexBonesJob(
             IGltfBuffers buffers,
             int weightsAccessorIndex,
-            int jointsAccessorIndex,
-            NativeSlice<JobHandle> handles
-            )
+            int jointsAccessorIndex
+        )
         {
             Profiler.BeginSample("ScheduleVertexBonesJob");
             Profiler.BeginSample("AllocateNativeArray");
@@ -69,6 +70,9 @@ namespace GLTFast {
             vData = new NativeArray<VBones>(weightsAcc.count, VertexBufferConfigBase.defaultAllocator);
             var vDataPtr = (byte*) NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(vData);
             Profiler.EndSample();
+
+            JobHandle weightsHandle;
+            JobHandle jointsHandle;
             
             {
                 var h = GetWeightsJob(
@@ -81,10 +85,10 @@ namespace GLTFast {
                     weightsAcc.normalized
                 );
                 if (h.HasValue) {
-                    handles[0] = h.Value;
+                    weightsHandle = h.Value;
                 } else {
                     Profiler.EndSample();
-                    return false;
+                    return null;
                 }
             }
 
@@ -103,14 +107,44 @@ namespace GLTFast {
                     logger
                 );
                 if (h.HasValue) {
-                    handles[1] = h.Value;
+                    jointsHandle = h.Value;
                 } else {
                     Profiler.EndSample();
-                    return false;
+                    return null;
                 }
             }
+
+            var jobHandle = JobHandle.CombineDependencies(weightsHandle,jointsHandle);
+
+            var skinWeights = (int)QualitySettings.skinWeights;
+
+#if UNITY_EDITOR
+            // If this is design-time import, fix and import all weights.
+            if(!UnityEditor.EditorApplication.isPlaying || skinWeights < 4) {
+                if (!UnityEditor.EditorApplication.isPlaying) {
+                    skinWeights = 4;
+                }
+#else
+            if(skinWeights < 4) { 
+#endif
+                var job = new SortAndRenormalizeBoneWeightsJob {
+                    bones = vData,
+                    skinWeights = math.max(1,skinWeights)
+                };
+                jobHandle = job.Schedule(vData.Length, GltfImport.DefaultBatchCount, jobHandle); 
+            }
+#if GLTFAST_SAFE
+            else {
+                // Re-normalizing alone is sufficient
+                var job = new RenormalizeBoneWeightsJob {
+                    bones = vData,
+                };
+                jobHandle = job.Schedule(vData.Length, GltfImport.DefaultBatchCount, jobHandle);
+            }
+#endif
+
             Profiler.EndSample();
-            return true;
+            return jobHandle;
         }
 
         public override void AddDescriptors(VertexAttributeDescriptor[] dst, int offset, int stream) {
@@ -155,11 +189,34 @@ namespace GLTFast {
                     jobHandle = jobTangentI.Schedule(count,GltfImport.DefaultBatchCount);
 #endif
                     break;
-                // TODO: Complete those cases
-                // case GLTFComponentType.UnsignedShort:
-                //     break;
-                // case GLTFComponentType.UnsignedByte:
-                //     break;
+                case GLTFComponentType.UnsignedShort: {
+                    var job = new Jobs.ConvertBoneWeightsUInt16ToFloatInterleavedJob {
+                        inputByteStride = inputByteStride>0 ? inputByteStride : 8,
+                        input = (byte*)input,
+                        outputByteStride = outputByteStride,
+                        result = output
+                    };
+#if UNITY_JOBS
+                    jobHandle = job.ScheduleBatch(count,GltfImport.DefaultBatchCount);
+#else
+                    jobHandle = job.Schedule(count,GltfImport.DefaultBatchCount);
+#endif
+                    break;
+                }
+                case GLTFComponentType.UnsignedByte: {
+                    var job = new Jobs.ConvertBoneWeightsUInt8ToFloatInterleavedJob {
+                        inputByteStride = inputByteStride>0 ? inputByteStride : 4,
+                        input = (byte*)input,
+                        outputByteStride = outputByteStride,
+                        result = output
+                    };
+#if UNITY_JOBS
+                    jobHandle = job.ScheduleBatch(count,GltfImport.DefaultBatchCount);
+#else
+                    jobHandle = job.Schedule(count,GltfImport.DefaultBatchCount);
+#endif
+                    break;
+                }
                 default:
                     logger?.Error(LogCode.TypeUnsupported,"Weights",inputType.ToString());
                     jobHandle = null;

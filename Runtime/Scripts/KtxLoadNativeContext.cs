@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,7 +13,11 @@
 // limitations under the License.
 //
 
-#if KTX_UNITY
+#if KTX_UNITY_2_2_OR_NEWER || (!UNITY_2021_2_OR_NEWER && KTX_UNITY_1_3_OR_NEWER)
+#define KTX
+#endif
+
+#if KTX
 
 using System.Threading.Tasks;
 using KtxUnity;
@@ -24,13 +28,20 @@ namespace GLTFast {
         NativeSlice<byte> slice;
 
         public KtxLoadNativeContext(int index,NativeSlice<byte> slice) {
-            this.imageIndex = index;
+            imageIndex = index;
             this.slice = slice;
             ktxTexture = new KtxTexture();
         }
 
-        public override async Task<TextureResult> LoadKtx(bool linear) {
-            return await ktxTexture.LoadBytesRoutine(slice,linear);
+        public override async Task<TextureResult> LoadTexture2D(bool linear) {
+            var errorCode = ktxTexture.Open(slice);
+            if (errorCode != ErrorCode.Success) {
+                return new TextureResult(errorCode);
+            }
+
+            var result = await ktxTexture.LoadTexture2D(linear);
+            ktxTexture.Dispose();
+            return result;
         }
     }
 }

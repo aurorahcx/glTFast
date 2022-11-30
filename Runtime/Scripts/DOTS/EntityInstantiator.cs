@@ -1,4 +1,4 @@
-// Copyright 2020-2021 Andreas Atteneder
+// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,12 +16,14 @@
 
 using System;
 using System.Collections.Generic;
+using GLTFast.Logging;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Rendering;
 using Unity.Transforms;
 using UnityEngine;
+using UnityEngine.Profiling;
 
 namespace GLTFast {
     public class EntityInstantiator : IInstantiator {
@@ -36,20 +38,37 @@ namespace GLTFast {
 
         protected Dictionary<uint,Entity> nodes;
 
+        protected InstantiationSettings settings;
+        
         EntityManager entityManager;
         EntityArchetype nodeArcheType;
         EntityArchetype sceneArcheType;
 
-        public EntityInstantiator(IGltfReadable gltf, Entity parent, ICodeLogger logger = null) {
+        Parent sceneParent;
+        
+        public EntityInstantiator(
+            IGltfReadable gltf,
+            Entity parent,
+            ICodeLogger logger = null,
+            InstantiationSettings settings = null
+            )
+        {
             this.gltf = gltf;
             this.parent = parent;
             this.logger = logger;
+            this.settings = settings ?? new InstantiationSettings();
         }
-
-        public virtual void Init() {
+        
+        /// <inheritdoc />
+        public void BeginScene(
+            string name,
+            uint[] nodeIndices
+        ) {
+            Profiler.BeginSample("BeginScene");
             nodes = new Dictionary<uint, Entity>();
             entityManager = World.DefaultGameObjectInjectionWorld.EntityManager;
             nodeArcheType = entityManager.CreateArchetype(
+                typeof(Disabled),
                 typeof(Translation),
                 typeof(Rotation),
                 typeof(Parent),
@@ -57,23 +76,61 @@ namespace GLTFast {
                 typeof(LocalToWorld)
             );
             sceneArcheType = entityManager.CreateArchetype(
+                typeof(Disabled),
                 typeof(Translation),
                 typeof(Rotation),
                 typeof(LocalToWorld)
             );
+            
+            if (settings.sceneObjectCreation == InstantiationSettings.SceneObjectCreation.Never
+                || settings.sceneObjectCreation == InstantiationSettings.SceneObjectCreation.WhenMultipleRootNodes && nodeIndices.Length == 1) {
+                sceneParent = new Parent { Value = parent };
+            }
+            else {
+                var sceneEntity = entityManager.CreateEntity(parent==Entity.Null ? sceneArcheType : nodeArcheType);
+                entityManager.SetComponentData(sceneEntity,new Translation {Value = new float3(0,0,0)});
+                entityManager.SetComponentData(sceneEntity,new Rotation {Value = quaternion.identity});
+#if UNITY_EDITOR
+                entityManager.SetName(sceneEntity, name ?? "Scene");
+#endif
+                if (parent != Entity.Null) {
+                    entityManager.SetComponentData(sceneEntity, new Parent { Value = parent });
+                }
+                sceneParent = new Parent { Value = sceneEntity };
+            }
+            Profiler.EndSample();
         }
+        
+#if UNITY_ANIMATION
+        /// <inheritdoc />
+        public void AddAnimation(AnimationClip[] animationClips) {
+            if ((settings.mask & ComponentType.Animation) != 0 && animationClips != null) {
+                // TODO: Add animation support
+            }
+        }
+#endif // UNITY_ANIMATION
 
+        /// <inheritdoc />
         public void CreateNode(
             uint nodeIndex,
+            uint? parentIndex,
             Vector3 position,
             Quaternion rotation,
             Vector3 scale
         ) {
+            Profiler.BeginSample("CreateNode");
             var node = entityManager.CreateEntity(nodeArcheType);
             entityManager.SetComponentData(node,new Translation {Value = position});
             entityManager.SetComponentData(node,new Rotation {Value = rotation});
             SetEntityScale(node, scale);
             nodes[nodeIndex] = node;
+            if (parentIndex.HasValue) {
+                entityManager.SetComponentData(node,new Parent{Value = nodes[parentIndex.Value]} );
+            }
+            else {
+                entityManager.SetComponentData(node, sceneParent);
+            }
+            Profiler.EndSample();
         }
 
         void SetEntityScale(Entity node, Vector3 scale) {
@@ -86,25 +143,27 @@ namespace GLTFast {
             }
         }
 
-        public void SetParent(uint nodeIndex, uint parentIndex) {
-            entityManager.SetComponentData(nodes[nodeIndex],new Parent{Value = nodes[parentIndex]} );
-        }
-
         public void SetNodeName(uint nodeIndex, string name) {
 #if UNITY_EDITOR
             entityManager.SetName(nodes[nodeIndex], name ?? $"Node-{nodeIndex}");
 #endif
         }
 
+        /// <inheritdoc />
         public virtual void AddPrimitive(
             uint nodeIndex,
             string meshName,
             Mesh mesh,
             int[] materialIndices,
             uint[] joints = null,
+            uint? rootJoint = null,
             float[] morphTargetWeights = null,
             int primitiveNumeration = 0
         ) {
+            if ((settings.mask & ComponentType.Mesh) == 0) {
+                return;
+            }
+            Profiler.BeginSample("AddPrimitive");
             Entity node;
             if(primitiveNumeration==0) {
                 // Use Node GameObject for first Primitive
@@ -121,7 +180,7 @@ namespace GLTFast {
             for (var index = 0; index < materialIndices.Length; index++) {
                 var material = gltf.GetMaterial(materialIndices[index]) ?? gltf.GetDefaultMaterial();
                  
-                RenderMeshUtility.AddComponents(node,entityManager,new RenderMeshDescription(mesh,material,subMeshIndex:index));
+                RenderMeshUtility.AddComponents(node,entityManager,new RenderMeshDescription(mesh,material,layer:settings.layer,subMeshIndex:index));
                  if(joints!=null || hasMorphTargets) {
                      if (joints != null) {
                          var bones = new Entity[joints.Length];
@@ -140,8 +199,10 @@ namespace GLTFast {
                      }
                  }
             }
+            Profiler.EndSample();
         }
 
+        /// <inheritdoc />
         public void AddPrimitiveInstanced(
             uint nodeIndex,
             string meshName,
@@ -153,6 +214,10 @@ namespace GLTFast {
             NativeArray<Vector3>? scales,
             int primitiveNumeration = 0
         ) {
+            if ((settings.mask & ComponentType.Mesh) == 0) {
+                return;
+            }
+            Profiler.BeginSample("AddPrimitiveInstanced");
             foreach (var materialIndex in materialIndices) {
                 var material = gltf.GetMaterial(materialIndex) ?? gltf.GetDefaultMaterial();
                 material.enableInstancing = true;
@@ -172,42 +237,37 @@ namespace GLTFast {
                     }
                 }
             }
+            Profiler.EndSample();
         }
 
+        /// <inheritdoc />
         public void AddCamera(uint nodeIndex, uint cameraIndex) {
+            if ((settings.mask & ComponentType.Camera) == 0) {
+                return;
+            }
             var camera = gltf.GetSourceCamera(cameraIndex);
             // TODO: Add camera support
         }
 
-        public void AddScene(
-            string name,
-            uint[] nodeIndices
-#if UNITY_ANIMATION
-            ,AnimationClip[] animationClips
-#endif // UNITY_ANIMATION
-            )
-        {
-            var sceneEntity = entityManager.CreateEntity(parent==Entity.Null ? sceneArcheType : nodeArcheType);
-            entityManager.SetComponentData(sceneEntity,new Translation {Value = new float3(0,0,0)});
-            entityManager.SetComponentData(sceneEntity,new Rotation {Value = quaternion.identity});
-#if UNITY_EDITOR
-            entityManager.SetName(sceneEntity, name ?? "Scene");
-#endif
-            if (parent != Entity.Null) {
-                entityManager.SetComponentData(sceneEntity, new Parent { Value = parent });
+        /// <inheritdoc />
+        public void AddLightPunctual(
+            uint nodeIndex,
+            uint lightIndex
+        ) {
+            if ((settings.mask & ComponentType.Light) == 0) {
+                return;
             }
-
-            var sceneParent = new Parent { Value = sceneEntity };
-            
-            foreach(var nodeIndex in nodeIndices) {
-                entityManager.SetComponentData(nodes[nodeIndex], sceneParent);
+            // TODO: Add lights support
+        }
+        
+        /// <inheritdoc />
+        public virtual void EndScene(uint[] rootNodeIndices) {
+            Profiler.BeginSample("EndScene");
+            entityManager.SetEnabled(sceneParent.Value, true);
+            foreach (var entity in nodes.Values) {
+                entityManager.SetEnabled(entity, true);
             }
-
-#if UNITY_ANIMATION
-            if (animationClips != null) {
-                // TODO: Add animation support
-            }
-#endif // UNITY_ANIMATION
+            Profiler.EndSample();
         }
     }
 }

@@ -1,4 +1,4 @@
-// Copyright 2020-2021 Andreas Atteneder
+// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@
 using System.IO;
 using System.Threading.Tasks;
 using GLTFast.Loading;
+using GLTFast.Logging;
+using GLTFast.Materials;
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -45,6 +47,8 @@ namespace GLTFast {
         [Tooltip("If checked, url is treated as relative StreamingAssets path.")]
         public bool streamingAsset = false;
 
+        public InstantiationSettings instantiationSettings;
+        
         Entity sceneRoot;
 
         public string FullUrl => streamingAsset
@@ -72,9 +76,9 @@ namespace GLTFast {
                 if (deferAgent != null) await deferAgent.BreakPoint();
                 // Auto-Instantiate
                 if (sceneId>=0) {
-                    InstantiateScene(sceneId,logger);
+                    await InstantiateScene(sceneId,logger);
                 } else {
-                    Instantiate(logger);
+                    await Instantiate(logger);
                 }
             }
             return success;
@@ -91,13 +95,13 @@ namespace GLTFast {
             );
             sceneRoot = entityManager.CreateEntity(sceneArchetype);
 #if UNITY_EDITOR
-            entityManager.SetName(sceneRoot,"glTF");
+            entityManager.SetName(sceneRoot, string.IsNullOrEmpty(name) ? "glTF" : name);
 #endif
-            entityManager.SetComponentData(sceneRoot,new Translation {Value = new float3(0,0,0)});
-            entityManager.SetComponentData(sceneRoot,new Rotation {Value = quaternion.identity});
-            entityManager.SetComponentData(sceneRoot,new Scale {Value = 1});
+            entityManager.SetComponentData(sceneRoot,new Translation {Value = transform.position});
+            entityManager.SetComponentData(sceneRoot,new Rotation {Value = transform.rotation});
+            entityManager.SetComponentData(sceneRoot,new Scale {Value = transform.localScale.x});
             // entityManager.AddBuffer<LinkedEntityGroup>(sceneRoot);
-            return new EntityInstantiator(importer, sceneRoot, logger);
+            return new EntityInstantiator(importer, sceneRoot, logger, instantiationSettings);
         }
         
         protected override void PostInstantiation(IInstantiator instantiator, bool success) {

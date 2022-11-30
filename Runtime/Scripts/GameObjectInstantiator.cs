@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,84 +15,259 @@
 
 using System;
 using System.Collections.Generic;
+using GLTFast.Schema;
 using Unity.Collections;
 using UnityEngine;
+using UnityEngine.Profiling;
+using Camera = UnityEngine.Camera;
+using Material = UnityEngine.Material;
+using Mesh = UnityEngine.Mesh;
+
 // #if UNITY_EDITOR && UNITY_ANIMATION
 // using UnityEditor.Animations;
 // #endif
 
 namespace GLTFast {
+    
+    using Logging;
+    
+    /// <summary>
+    /// Generates a GameObject hierarchy from a glTF scene 
+    /// </summary>
     public class GameObjectInstantiator : IInstantiator {
 
+        /// <summary>
+        /// Descriptor of a glTF scene instance
+        /// </summary>
         public class SceneInstance {
+            
+            /// <summary>
+            /// List of instantiated cameras
+            /// </summary>
             public List<Camera> cameras { get; private set; }
+            /// <summary>
+            /// List of instantiated lights
+            /// </summary>
+            public List<Light> lights { get; private set; }
+            
+#if UNITY_ANIMATION
+            /// <summary>
+            /// <see cref="Animation" /> component. Is null if scene has no 
+			/// animation clips.
+            /// Only available if the built-in Animation module is enabled.
+            /// </summary>
+            public Animation legacyAnimation { get; private set; }
+#endif
 
-            public void AddCamera(Camera camera) {
+            /// <summary>
+            /// Adds a camera
+            /// </summary>
+            /// <param name="camera">Camera to be added</param>
+            internal void AddCamera(Camera camera) {
                 if (cameras == null) {
                     cameras = new List<Camera>();
                 }
                 cameras.Add(camera);
             }
+            
+            internal void AddLight(Light light) {
+                if (lights == null) {
+                    lights = new List<Light>();
+                }
+                lights.Add(light);
+            }
+
+#if UNITY_ANIMATION
+            internal void SetLegacyAnimation(Animation animation) {
+                legacyAnimation = animation;
+            }
+#endif
         }
         
+        /// <summary>
+        /// Instantiation settings
+        /// </summary>
+        protected InstantiationSettings settings;
+        
+        /// <summary>
+        /// Instantiation logger
+        /// </summary>
         protected ICodeLogger logger;
         
+        /// <summary>
+        /// glTF to instantiate from
+        /// </summary>
         protected IGltfReadable gltf;
         
+        /// <summary>
+        /// Generated GameObjects will get parented to this Transform
+        /// </summary>
         protected Transform parent;
 
+        /// <summary>
+        /// glTF node index to instantiated GameObject dictionary
+        /// </summary>
         protected Dictionary<uint,GameObject> nodes;
 
+        /// <summary>
+        /// Transform representing the scene.
+        /// Root nodes will get parented to it.
+        /// </summary>
+        public Transform sceneTransform { get; protected set; }
+        
         /// <summary>
         /// Contains information about the latest instance of a glTF scene
         /// </summary>
         public SceneInstance sceneInstance { get; protected set; }
         
-        public GameObjectInstantiator(IGltfReadable gltf, Transform parent, ICodeLogger logger = null) {
+        /// <summary>
+        /// Constructs a GameObjectInstantiator
+        /// </summary>
+        /// <param name="gltf">glTF to instantiate from</param>
+        /// <param name="parent">Generated GameObjects will get parented to this Transform</param>
+        /// <param name="logger">Custom logger</param>
+        /// <param name="settings">Instantiation settings</param>
+        public GameObjectInstantiator(
+            IGltfReadable gltf,
+            Transform parent,
+            ICodeLogger logger = null,
+            InstantiationSettings settings = null
+            )
+        {
             this.gltf = gltf;
             this.parent = parent;
             this.logger = logger;
+            this.settings = settings ?? new InstantiationSettings();
         }
 
-        public virtual void Init() {
+        /// <inheritdoc />
+        public virtual void BeginScene(
+            string name,
+            uint[] rootNodeIndices
+            ) {
+            Profiler.BeginSample("BeginScene");
+            
             nodes = new Dictionary<uint, GameObject>();
             sceneInstance = new SceneInstance();
+            
+            GameObject sceneGameObject;
+            if (settings.sceneObjectCreation == InstantiationSettings.SceneObjectCreation.Never
+                || settings.sceneObjectCreation == InstantiationSettings.SceneObjectCreation.WhenMultipleRootNodes && rootNodeIndices.Length == 1) {
+                sceneGameObject = parent.gameObject;
+            }
+            else {
+                sceneGameObject = new GameObject(name ?? "Scene");
+                sceneGameObject.transform.SetParent( parent, false);
+                sceneGameObject.layer = settings.layer;
+            }
+            sceneTransform = sceneGameObject.transform;
+            Profiler.EndSample();
         }
 
+#if UNITY_ANIMATION
+        /// <inheritdoc />
+        public void AddAnimation(AnimationClip[] animationClips) {
+            if ((settings.mask & ComponentType.Animation) != 0 && animationClips != null) {
+                // we want to create an Animator for non-legacy clips, and an Animation component for legacy clips.
+                var isLegacyAnimation = animationClips.Length > 0 && animationClips[0].legacy;
+// #if UNITY_EDITOR
+//                 // This variant creates a Mecanim Animator and AnimationController
+//                 // which does not work at runtime. It's kept for potential Editor import usage
+//                 if(!isLegacyAnimation) {
+//                     var animator = go.AddComponent<Animator>();
+//                     var controller = new UnityEditor.Animations.AnimatorController();
+//                     controller.name = animator.name;
+//                     controller.AddLayer("Default");
+//                     controller.layers[0].defaultWeight = 1;
+//                     for (var index = 0; index < animationClips.Length; index++) {
+//                         var clip = animationClips[index];
+//                         // controller.AddLayer(clip.name);
+//                         // controller.layers[index].defaultWeight = 1;
+//                         var state = controller.AddMotion(clip, 0);
+//                         controller.AddParameter("Test", AnimatorControllerParameterType.Bool);
+//                         // var stateMachine = controller.layers[0].stateMachine;
+//                         // UnityEditor.Animations.AnimatorState entryState = null;
+//                         // var state = stateMachine.AddState(clip.name);
+//                         // state.motion = clip;
+//                         // var loopTransition = state.AddTransition(state);
+//                         // loopTransition.hasExitTime = true;
+//                         // loopTransition.duration = 0;
+//                         // loopTransition.exitTime = 0;
+//                         // entryState = state;
+//                         // stateMachine.AddEntryTransition(entryState);
+//                         // UnityEditor.Animations.AnimatorController.CreateAnimatorControllerAtPath
+//                     }
+//                     
+//                     animator.runtimeAnimatorController = controller;
+//                     
+//                     // for (var index = 0; index < animationClips.Length; index++) {
+//                     //     controller.layers[index].blendingMode = UnityEditor.Animations.AnimatorLayerBlendingMode.Additive;
+//                     //     animator.SetLayerWeight(index,1);
+//                     // }
+//                 }
+// #endif // UNITY_EDITOR
+
+                if(isLegacyAnimation) {
+                    var animation = sceneTransform.gameObject.AddComponent<Animation>();
+                    
+                    for (var index = 0; index < animationClips.Length; index++) {
+                        var clip = animationClips[index];
+                        animation.AddClip(clip,clip.name);
+                        if (index < 1) {
+                            animation.clip = clip;
+                        }
+                    }
+
+                    sceneInstance.SetLegacyAnimation(animation);
+                }
+                else {
+                    sceneTransform.gameObject.AddComponent<Animator>();
+                }
+            }
+        }
+#endif // UNITY_ANIMATION
+
+        /// <inheritdoc />
         public void CreateNode(
             uint nodeIndex,
+            uint? parentIndex,
             Vector3 position,
             Quaternion rotation,
             Vector3 scale
         ) {
             var go = new GameObject();
+            // Deactivate root-level nodes, so half-loaded scenes won't render.
+            go.SetActive(parentIndex.HasValue);
             go.transform.localScale = scale;
             go.transform.localPosition = position;
             go.transform.localRotation = rotation;
+            go.layer = settings.layer;
             nodes[nodeIndex] = go;
+            
+            go.transform.SetParent(
+                parentIndex.HasValue ? nodes[parentIndex.Value].transform : sceneTransform,
+                false);
         }
 
-        public void SetParent(uint nodeIndex, uint parentIndex) {
-            if(nodes[nodeIndex]==null || nodes[parentIndex]==null ) {
-                logger?.Error(LogCode.HierarchyInvalid);
-                return;
-            }
-            nodes[nodeIndex].transform.SetParent(nodes[parentIndex].transform,false);
-        }
-
-        public void SetNodeName(uint nodeIndex, string name) {
+        /// <inheritdoc />
+        public virtual void SetNodeName(uint nodeIndex, string name) {
             nodes[nodeIndex].name = name ?? $"Node-{nodeIndex}";
         }
 
+        /// <inheritdoc />
         public virtual void AddPrimitive(
             uint nodeIndex,
             string meshName,
             Mesh mesh,
             int[] materialIndices,
             uint[] joints = null,
+            uint? rootJoint = null,
             float[] morphTargetWeights = null,
             int primitiveNumeration = 0
         ) {
+            if ((settings.mask & ComponentType.Mesh) == 0) {
+                return;
+            }
 
             GameObject meshGo;
             if(primitiveNumeration==0) {
@@ -101,6 +276,7 @@ namespace GLTFast {
             } else {
                 meshGo = new GameObject(meshName);
                 meshGo.transform.SetParent(nodes[nodeIndex].transform,false);
+                meshGo.layer = settings.layer;
             }
 
             Renderer renderer;
@@ -113,6 +289,7 @@ namespace GLTFast {
                 renderer = mr;
             } else {
                 var smr = meshGo.AddComponent<SkinnedMeshRenderer>();
+                smr.updateWhenOffscreen = settings.skinUpdateWhenOffscreen;
                 if (joints != null) {
                     var bones = new Transform[joints.Length];
                     for (var j = 0; j < bones.Length; j++)
@@ -121,6 +298,9 @@ namespace GLTFast {
                         bones[j] = nodes[jointIndex].transform;
                     }
                     smr.bones = bones;
+                    if (rootJoint.HasValue) {
+                        smr.rootBone = nodes[rootJoint.Value].transform;
+                    }
                 }
                 smr.sharedMesh = mesh;
                 if (morphTargetWeights!=null) {
@@ -134,14 +314,15 @@ namespace GLTFast {
 
             var materials = new Material[materialIndices.Length];
             for (var index = 0; index < materials.Length; index++) {
-                 var material = gltf.GetMaterial(materialIndices[index]) ?? gltf.GetDefaultMaterial();
-                 materials[index] = material;
+                var material = gltf.GetMaterial(materialIndices[index]) ?? gltf.GetDefaultMaterial();
+                materials[index] = material;
             }
 
             renderer.sharedMaterials = materials;
         }
 
-        public void AddPrimitiveInstanced(
+        /// <inheritdoc />
+        public virtual void AddPrimitiveInstanced(
             uint nodeIndex,
             string meshName,
             Mesh mesh,
@@ -152,6 +333,10 @@ namespace GLTFast {
             NativeArray<Vector3>? scales,
             int primitiveNumeration = 0
         ) {
+            if ((settings.mask & ComponentType.Mesh) == 0) {
+                return;
+            }
+            
             var materials = new Material[materialIndices.Length];
             for (var index = 0; index < materials.Length; index++) {
                 var material = gltf.GetMaterial(materialIndices[index]) ?? gltf.GetDefaultMaterial();
@@ -161,6 +346,7 @@ namespace GLTFast {
 
             for (var i = 0; i < instanceCount; i++) {
                 var meshGo = new GameObject( $"{meshName}_i{i}" );
+                meshGo.layer = settings.layer;
                 var t = meshGo.transform;
                 t.SetParent(nodes[nodeIndex].transform,false);
                 t.localPosition = positions?[i] ?? Vector3.zero;
@@ -174,7 +360,11 @@ namespace GLTFast {
             }
         }
 
-        public void AddCamera(uint nodeIndex, uint cameraIndex) {
+        /// <inheritdoc />
+        public virtual void AddCamera(uint nodeIndex, uint cameraIndex) {
+            if ((settings.mask & ComponentType.Camera) == 0) {
+                return;
+            }
             var camera = gltf.GetSourceCamera(cameraIndex);
             switch (camera.typeEnum) {
             case Schema.Camera.Type.Orthographic:
@@ -263,7 +453,7 @@ namespace GLTFast {
 
         /// <summary>
         /// Creates a camera component on the given node and returns an approximated
-        /// local-to-world scale factor, required to counter-act that Unity scales
+        /// local-to-world scale factor, required to counteract that Unity scales
         /// near- and far-clipping-planes via Transform.
         /// </summary>
         /// <param name="nodeIndex">Node's index</param>
@@ -273,6 +463,7 @@ namespace GLTFast {
         Camera CreateCamera(uint nodeIndex,string cameraName, out float localScale) {
             var cameraParent = nodes[nodeIndex];
             var camGo = new GameObject(cameraName ?? $"{cameraParent.name}-Camera" ?? $"Camera-{nodeIndex}");
+            camGo.layer = settings.layer;
             var camTrans = camGo.transform;
             var parentTransform = cameraParent.transform;
             camTrans.SetParent(parentTransform,false);
@@ -306,78 +497,39 @@ namespace GLTFast {
         //     }
         // }
 
-        public void AddScene(
-            string name,
-            uint[] nodeIndices
-#if UNITY_ANIMATION
-            ,AnimationClip[] animationClips
-#endif // UNITY_ANIMATION
-            )
-        {
-            var go = new GameObject(name ?? "Scene");
-            go.transform.SetParent( parent, false);
+        /// <inheritdoc />
+        public void AddLightPunctual(
+            uint nodeIndex,
+            uint lightIndex
+        ) {
+            if ((settings.mask & ComponentType.Light) == 0) {
+                return;
+            }
+            var lightGameObject = nodes[nodeIndex];
+            var lightSource = gltf.GetSourceLightPunctual(lightIndex);
 
-            foreach(var nodeIndex in nodeIndices) {
-                if (nodes[nodeIndex] != null) {
-                    nodes[nodeIndex].transform.SetParent( go.transform, false );
+            if (lightSource.typeEnum != LightPunctual.Type.Point) {
+                // glTF lights' direction is flipped, compared with Unity's, so
+                // we're adding a rotated child GameObject to counteract.
+                var tmp = new GameObject($"{lightGameObject.name}_Orientation");
+                tmp.transform.SetParent(lightGameObject.transform,false);
+                tmp.transform.localEulerAngles = new Vector3(0, 180, 0);
+                lightGameObject = tmp;
+            }
+            var light = lightGameObject.AddComponent<Light>();
+            lightSource.ToUnityLight(light, settings.lightIntensityFactor);
+            sceneInstance.AddLight(light);
+        }
+        
+        /// <inheritdoc />
+        public virtual void EndScene(uint[] rootNodeIndices) {
+            Profiler.BeginSample("EndScene");
+            if (rootNodeIndices != null) {
+                foreach (var nodeIndex in rootNodeIndices) {
+                    nodes[nodeIndex].SetActive(true);
                 }
             }
-
-#if UNITY_ANIMATION
-            if (animationClips != null) {
-                // we want to create an Animator for non-legacy clips, and an Animation component for legacy clips.
-                var isLegacyAnimation = animationClips.Length > 0 && animationClips[0].legacy;
-// #if UNITY_EDITOR
-//                 // This variant creates a Mecanim Animator and AnimationController
-//                 // which does not work at runtime. It's kept for potential Editor import usage
-//                 if(!isLegacyAnimation) {
-//                     var animator = go.AddComponent<Animator>();
-//                     var controller = new UnityEditor.Animations.AnimatorController();
-//                     controller.name = animator.name;
-//                     controller.AddLayer("Default");
-//                     controller.layers[0].defaultWeight = 1;
-//                     for (var index = 0; index < animationClips.Length; index++) {
-//                         var clip = animationClips[index];
-//                         // controller.AddLayer(clip.name);
-//                         // controller.layers[index].defaultWeight = 1;
-//                         var state = controller.AddMotion(clip, 0);
-//                         controller.AddParameter("Test", AnimatorControllerParameterType.Bool);
-//                         // var stateMachine = controller.layers[0].stateMachine;
-//                         // UnityEditor.Animations.AnimatorState entryState = null;
-//                         // var state = stateMachine.AddState(clip.name);
-//                         // state.motion = clip;
-//                         // var loopTransition = state.AddTransition(state);
-//                         // loopTransition.hasExitTime = true;
-//                         // loopTransition.duration = 0;
-//                         // loopTransition.exitTime = 0;
-//                         // entryState = state;
-//                         // stateMachine.AddEntryTransition(entryState);
-//                         // UnityEditor.Animations.AnimatorController.CreateAnimatorControllerAtPath
-//                     }
-//                     
-//                     animator.runtimeAnimatorController = controller;
-//                     
-//                     // for (var index = 0; index < animationClips.Length; index++) {
-//                     //     controller.layers[index].blendingMode = UnityEditor.Animations.AnimatorLayerBlendingMode.Additive;
-//                     //     animator.SetLayerWeight(index,1);
-//                     // }
-//                 }
-// #endif // UNITY_EDITOR
-
-                if(isLegacyAnimation) {
-                    var animation = go.AddComponent<Animation>();
-                    
-                    for (var index = 0; index < animationClips.Length; index++) {
-                        var clip = animationClips[index];
-                        animation.AddClip(clip,clip.name);
-                        if (index < 1) {
-                            animation.clip = clip;
-                        }
-                    }
-                    animation.Play();
-                }
-            }
-#endif // UNITY_ANIMATION
+            Profiler.EndSample();
         }
     }
 }

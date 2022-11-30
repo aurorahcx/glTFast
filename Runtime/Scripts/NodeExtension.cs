@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,15 +13,26 @@
 // limitations under the License.
 //
 
-
-using GLTFast.Schema;
 using UnityEngine;
 using UnityEngine.Assertions;
 
 namespace GLTFast {
+
+    using Schema;
     
+    /// <summary>
+    /// Extension methods for <seealso cref="Node"/>
+    /// </summary>
     public static class NodeExtension {
 
+        /// <summary>
+        /// Get translation, rotation and scale of a node, regardless of source
+        /// properties
+        /// </summary>
+        /// <param name="node">Input node</param>
+        /// <param name="position">Node's translation</param>
+        /// <param name="rotation">Node's rotation</param>
+        /// <param name="scale">Node's scale</param>
         public static void GetTransform(this Node node, out Vector3 position, out Quaternion rotation, out Vector3 scale) {
 
             position = Vector3.zero;

@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ namespace GLTFast
 #if BURST
     using Unity.Mathematics;
 #endif
-    using Schema;
+    using Logging;
 
     class VertexBufferConfig<VType> :
         VertexBufferConfigBase
@@ -104,13 +104,35 @@ namespace GLTFast
             }
             
             if (uvAccessorIndices!=null && uvAccessorIndices.Length>0) {
+                
+                // More than two UV sets are not supported yet
+                Assert.IsTrue(uvAccessorIndices.Length<9);
+                
                 jobCount += uvAccessorIndices.Length;
                 switch (uvAccessorIndices.Length) {
                     case 1:
                         texCoords = new VertexBufferTexCoords<VTexCoord1>(logger);
                         break;
-                    default:
+                    case 2:
                         texCoords = new VertexBufferTexCoords<VTexCoord2>(logger);
+                        break;
+                    case 3:
+                        texCoords = new VertexBufferTexCoords<VTexCoord3>(logger);
+                        break;
+                    case 4:
+                        texCoords = new VertexBufferTexCoords<VTexCoord4>(logger);
+                        break;
+                    case 5:
+                        texCoords = new VertexBufferTexCoords<VTexCoord5>(logger);
+                        break;
+                    case 6:
+                        texCoords = new VertexBufferTexCoords<VTexCoord6>(logger);
+                        break;
+                    case 7:
+                        texCoords = new VertexBufferTexCoords<VTexCoord7>(logger);
+                        break;
+                    default:
+                        texCoords = new VertexBufferTexCoords<VTexCoord8>(logger);
                         break;
                 }
             }
@@ -123,7 +145,7 @@ namespace GLTFast
 
             hasBones = weightsAccessorIndex >= 0 && jointsAccessorIndex >= 0;
             if(hasBones) {
-                jobCount+=2;
+                jobCount++;
                 bones = new VertexBufferBones(logger);
             }
 
@@ -133,11 +155,6 @@ namespace GLTFast
             {
                 JobHandle? h = null;
                 if(posAcc.bufferView>=0) {
-#if DEBUG
-                    if (posAcc.normalized) {
-                        Debug.LogError("Normalized Positions will likely produce incorrect results. Please report this error at https://github.com/atteneder/glTFast/issues/new?assignees=&labels=bug&template=bug_report.md&title=Normalized%20Positions");
-                    }
-#endif
                     h = GetVector3sJob(
                         posData,
                         posAcc.count,
@@ -145,7 +162,8 @@ namespace GLTFast
                         posByteStride,
                         (float3*) vDataPtr,
                         outputByteStride,
-                        posAcc.normalized
+                        posAcc.normalized,
+                        false // positional data never needs to be normalized
                     );
                 }
                 if (posAcc.isSparse) {
@@ -191,7 +209,8 @@ namespace GLTFast
                     inputByteStride,
                     (float3*) (vDataPtr+12),
                     outputByteStride,
-                    nrmAcc.normalized
+                    nrmAcc.normalized,
+                    true // normals need to be unit length
                 );
                 if (h.HasValue) {
                     handles[handleIndex] = h.Value;
@@ -236,7 +255,7 @@ namespace GLTFast
                         uvAccessorIndices.Length
                         )
                     );
-                handleIndex++;
+                handleIndex += uvAccessorIndices.Length;
             }
             
             if (hasColors) {
@@ -253,17 +272,18 @@ namespace GLTFast
             }
 
             if (hasBones) {
-                bones.ScheduleVertexBonesJob(
+                var h = bones.ScheduleVertexBonesJob(
                     buffers,
                     weightsAccessorIndex,
-                    jointsAccessorIndex,
-                    new NativeSlice<JobHandle>(
-                        handles,
-                        handleIndex,
-                        2
-                        )
-                    );
-                handleIndex+=2;
+                    jointsAccessorIndex
+                );
+                if (h.HasValue) {
+                    handles[handleIndex] = h.Value;
+                    handleIndex++;
+                } else {
+                    Profiler.EndSample();
+                    return null;
+                }
             }
             
             var handle = (jobCount > 1) ? JobHandle.CombineDependencies(handles) : handles[0];

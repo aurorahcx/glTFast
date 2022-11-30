@@ -12,9 +12,16 @@ A clear and concise description of what the bug is.
 
 **Files**
 
-Attach or link to *.gltf/*.glb files that trigger the bug.
+Attach or link to *.gltf/*.glb files that trigger the bug. 
+
+In addition, make sure to run those files through the [glTF Validator](https://github.khronos.org/glTF-Validator) first. If you encounter errors or warnings, try to make sure they are not responsible for the issue and file a bug report with the software that generated the glTF file as well.
 
 > Note: You have to ZIP archive them first in order for GitHub to accept the upload.
+
+If your files are confidential:
+
+- Try to create a similar, but intellectual-property-free glTF that reproduces the bug in the same way (so any community member can have a look)
+- Otherwise, still create this issue and send the files (or a link to them) discretely via email
 
 **To Reproduce**
 Steps to reproduce the behavior:

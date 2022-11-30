@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2021 Andreas Atteneder
+﻿// Copyright 2020-2022 Andreas Atteneder
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,11 +30,22 @@ namespace GLTFast {
             var stopWatch = new Stopwatch();
             stopWatch.Start();
 #endif
+            Root root = null;
+            
             // Step one: main JSON parsing
             Profiler.BeginSample("JSON main");
-            var root = JsonUtility.FromJson<Root>(json);
-            Profiler.EndSample();
+            try {
+                root = JsonUtility.FromJson<Root>(json);
+            }
+            catch (System.ArgumentException) {
+                return null;
+            }
 
+            if (root == null) {
+                return null;
+            }
+            Profiler.EndSample();
+            
             // Step two:
             // detect, if a secondary null-check is necessary.
             Profiler.BeginSample("JSON extension check");
@@ -165,7 +176,17 @@ namespace GLTFast {
                 for (int i = 0; i < root.nodes.Length; i++) {
                     var e = root.nodes[i].extensions;
                     if (e != null) {
+                        // Check if GPU instancing extension is valid
                         if (e.EXT_mesh_gpu_instancing?.attributes == null) {
+                            e.EXT_mesh_gpu_instancing = null;
+                        }
+                        // Check if Lights extension is valid
+                        if ((e.KHR_lights_punctual?.light ?? -1) < 0) {
+                            e.KHR_lights_punctual = null;
+                        }
+                        // Unset `extension` if none of them was valid
+                        if (e.EXT_mesh_gpu_instancing == null && 
+                            e.KHR_lights_punctual == null ) {
                             root.nodes[i].extensions = null;
                         }
                     }
